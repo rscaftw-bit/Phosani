@@ -41,6 +41,8 @@ public class PhosaniState {
     private WorldPoint lastBossTile = null;
     // Tiles of the lane she is about to surge through
     private Set<WorldPoint> surgeTiles = new HashSet<>();
+    // Her centre tile right after the edge teleport
+    private WorldPoint surgeStartTile = null;
     private int surgeExpiryTick = -1;
     // Ignore further position jumps until this tick (her landing / walking back)
     private int surgeCooldownUntil = -1;
@@ -49,6 +51,12 @@ public class PhosaniState {
     private boolean cursed = false;
     // Safety timeout in case the "wear off" chat message is missed
     private int curseExpiryTick = -1;
+
+    // ── Parasite ─────────────────────────────────────────────────────────────
+    // Show "PARASITE IN YOU" until this tick (set from the chat message)
+    private int parasiteWarningUntil = -1;
+    private boolean invHasBalm = false;
+    private boolean invHasSanfew = false;
 
     public boolean isActive() {
         return nightmare != null && !nightmare.isDead();
@@ -70,6 +78,8 @@ public class PhosaniState {
         autoAttackCount = 0;
         lastBossTile = null;
         surgeTiles.clear();
+        surgeStartTile = null;
+        parasiteWarningUntil = -1;
         surgeExpiryTick = -1;
         surgeCooldownUntil = -1;
         cursed = false;

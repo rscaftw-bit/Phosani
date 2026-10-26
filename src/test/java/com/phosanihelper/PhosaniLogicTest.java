@@ -35,23 +35,44 @@ public class PhosaniLogicTest {
     }
 
     @Test
-    public void surgeFromWestEdgeGoesEast() {
+    public void surgeLaneIsPerpendicularToTeleportJumpByDefault() {
         WorldPoint middle = new WorldPoint(100, 100, 0);
-        WorldPoint westEdge = new WorldPoint(90, 101, 0);
-        assertTrue(PhosaniLogic.tileDistance(middle, westEdge) >= 5);
-        assertArrayEquals(new int[]{1, 0}, PhosaniLogic.surgeDirection(middle, westEdge));
-
-        Set<WorldPoint> lane = PhosaniLogic.surgeLane(westEdge, new int[]{1, 0}, 5, 20);
-        assertTrue(lane.contains(new WorldPoint(110, 101, 0)));   // far side, centre row
-        assertTrue(lane.contains(new WorldPoint(100, 103, 0)));   // 2 rows off centre = inside 5-wide lane
-        assertFalse(lane.contains(new WorldPoint(100, 104, 0)));  // 3 rows off = safe
-        assertEquals(5 * (20 + 2 + 1), lane.size());
+        // Horizontal jump (west) -> user observed a VERTICAL charge
+        assertArrayEquals(new int[]{0, 1}, PhosaniLogic.surgeAxis(middle, new WorldPoint(90, 101, 0), true));
+        // Vertical jump (north) -> HORIZONTAL charge
+        assertArrayEquals(new int[]{1, 0}, PhosaniLogic.surgeAxis(middle, new WorldPoint(99, 110, 0), true));
+        // Option off -> jump axis
+        assertArrayEquals(new int[]{1, 0}, PhosaniLogic.surgeAxis(middle, new WorldPoint(90, 101, 0), false));
+        assertNull(PhosaniLogic.surgeAxis(middle, middle, true));
     }
 
     @Test
-    public void surgeFromNorthEdgeGoesSouth() {
-        assertArrayEquals(new int[]{0, -1},
-            PhosaniLogic.surgeDirection(new WorldPoint(100, 100, 0), new WorldPoint(99, 110, 0)));
+    public void movementAxisIsGroundTruth() {
+        WorldPoint start = new WorldPoint(90, 100, 0);
+        assertArrayEquals(new int[]{0, 1}, PhosaniLogic.movementAxis(start, new WorldPoint(90, 97, 0)));
+        assertArrayEquals(new int[]{1, 0}, PhosaniLogic.movementAxis(start, new WorldPoint(93, 100, 0)));
+    }
+
+    @Test
+    public void verticalLaneCoversBothDirectionsAndIsFiveWide() {
+        WorldPoint c = new WorldPoint(100, 100, 0);
+        Set<WorldPoint> lane = PhosaniLogic.surgeLane(c, new int[]{0, 1}, 5, 20);
+        assertTrue(lane.contains(new WorldPoint(100, 120, 0)));
+        assertTrue(lane.contains(new WorldPoint(100, 80, 0)));
+        assertTrue(lane.contains(new WorldPoint(102, 110, 0)));
+        assertFalse(lane.contains(new WorldPoint(103, 110, 0)));   // 3 columns off = safe
+        assertFalse(lane.contains(new WorldPoint(110, 100, 0)));   // NOT a horizontal lane
+        assertEquals(5 * 41, lane.size());
+    }
+
+    @Test
+    public void addNames() {
+        String names = "Parasite,Sleepwalker,Husk";
+        assertTrue(PhosaniLogic.nameMatches("Parasite", names));
+        assertTrue(PhosaniLogic.nameMatches("sleepwalker", names));
+        assertFalse(PhosaniLogic.nameMatches("Phosani's Nightmare", names));
+        assertFalse(PhosaniLogic.nameMatches(null, names));
+        assertTrue("The Nightmare has impregnated you with a deadly parasite!".contains(PhosaniLogic.PARASITE_START));
     }
 
     @Test
@@ -60,5 +81,16 @@ public class PhosaniLogicTest {
         assertArrayEquals(new int[]{-1, 0}, PhosaniLogic.directionFromOrientation(512));
         assertArrayEquals(new int[]{0, 1},  PhosaniLogic.directionFromOrientation(1024));
         assertArrayEquals(new int[]{1, 0},  PhosaniLogic.directionFromOrientation(1536));
+        assertArrayEquals(new int[]{0, 1},  PhosaniLogic.axisFromOrientation(1024));
+    }
+
+    @org.junit.Test
+    public void parasiteTextPrefersBalm() {
+        org.junit.Assert.assertTrue(PhosaniLogic.parasiteText(true, true).contains("Relicym"));
+        org.junit.Assert.assertTrue(PhosaniLogic.parasiteText(false, true).contains("Sanfew"));
+        org.junit.Assert.assertTrue(PhosaniLogic.parasiteText(false, false).contains("no Sanfew"));
+        org.junit.Assert.assertTrue(PhosaniLogic.isBalm("Relicym's balm(3)"));
+        org.junit.Assert.assertTrue(PhosaniLogic.isSanfew("Sanfew serum(4)"));
+        org.junit.Assert.assertFalse(PhosaniLogic.isSanfew("Super restore(4)"));
     }
 }

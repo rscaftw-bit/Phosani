@@ -65,6 +65,25 @@ public class PhosaniHelperOverlay extends Overlay {
             }
         }
 
+        // ── 2b. Adds: parasites, sleepwalkers, husks (by NPC name) ──────────────
+        if (config.highlightNpcs()) {
+            renderAdds(g);
+        }
+
+        // ── 2c. Parasite-in-you warning (from chat message) ───────────────────
+        if (client.getTickCount() < state.getParasiteWarningUntil() && client.getLocalPlayer() != null) {
+            String t = PhosaniLogic.parasiteText(state.isInvHasBalm(), state.isInvHasSanfew());
+            net.runelite.api.Point loc = client.getLocalPlayer()
+                .getCanvasTextLocation(g, t, client.getLocalPlayer().getLogicalHeight() + 60);
+            if (loc != null) {
+                g.setFont(new Font("Arial", Font.BOLD, 14));
+                g.setColor(Color.BLACK);
+                g.drawString(t, loc.getX() + 1, loc.getY() + 1);
+                g.setColor((state.isInvHasBalm() || state.isInvHasSanfew()) ? Color.YELLOW : Color.RED);
+                g.drawString(t, loc.getX(), loc.getY());
+            }
+        }
+
         // ── 3. Surge lane ─────────────────────────────────────────────────────
         if (config.showSurgeOverlay() && state.isSurgeActive()) {
             renderSurgeLane(g, state);
@@ -79,6 +98,36 @@ public class PhosaniHelperOverlay extends Overlay {
         }
 
         return null;
+    }
+
+    // ── Adds rendering ────────────────────────────────────────────────────────
+
+    private void renderAdds(Graphics2D g) {
+        Color c = config.highlightColor();
+        Color fill = new Color(c.getRed(), c.getGreen(), c.getBlue(), 50);
+        for (NPC npc : client.getNpcs()) {
+            if (npc == null || npc.isDead()) continue;
+            if (!PhosaniLogic.nameMatches(npc.getName(), config.highlightNames())) continue;
+
+            LocalPoint lp = npc.getLocalLocation();
+            if (lp != null) {
+                int size = npc.getComposition() != null ? npc.getComposition().getSize() : 1;
+                Polygon tile = Perspective.getCanvasTileAreaPoly(client, lp, size);
+                if (tile != null) {
+                    g.setColor(fill);
+                    g.fill(tile);
+                    g.setColor(c);
+                    g.setStroke(new BasicStroke(2));
+                    g.draw(tile);
+                }
+            }
+            Shape hull = npc.getConvexHull();
+            if (hull != null) {
+                g.setColor(c);
+                g.setStroke(new BasicStroke(2));
+                g.draw(hull);
+            }
+        }
     }
 
     // ── Surge rendering ───────────────────────────────────────────────────────

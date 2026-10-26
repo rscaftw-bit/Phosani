@@ -11,7 +11,16 @@ import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
+import net.runelite.client.ui.ClientToolbar;
+import net.runelite.client.ui.NavigationButton;
 import net.runelite.client.ui.overlay.OverlayManager;
+import net.runelite.client.util.ImageUtil;
+import javax.swing.SwingUtilities;
+import java.awt.Color;
+import java.awt.Font;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.image.BufferedImage;
 import net.runelite.client.util.Text;
 
 import javax.inject.Inject;
@@ -33,6 +42,10 @@ public class PhosaniHelperPlugin extends Plugin {
     @Inject private PhosaniHelperOverlay tileOverlay;
     @Inject private PrayerHelperOverlay prayerOverlay;
     @Inject private PhosaniHelperConfig config;
+    @Inject private ClientToolbar clientToolbar;
+
+    private PhosaniPanel panel;
+    private NavigationButton navButton;
 
     // ── Shared state ──────────────────────────────────────────────────────────
 
@@ -51,6 +64,14 @@ public class PhosaniHelperPlugin extends Plugin {
         phosaniIds = parseIds(config.npcIdPhosani());
         overlayManager.add(tileOverlay);
         overlayManager.add(prayerOverlay);
+        panel = new PhosaniPanel();
+        navButton = NavigationButton.builder()
+            .tooltip("Phosani's Nightmare")
+            .icon(makeIcon())
+            .priority(7)
+            .panel(panel)
+            .build();
+        clientToolbar.addNavigation(navButton);
         log.info("Phosani Helper started – watching NPC IDs: {}", phosaniIds);
     }
 
@@ -58,6 +79,9 @@ public class PhosaniHelperPlugin extends Plugin {
     protected void shutDown() {
         overlayManager.remove(tileOverlay);
         overlayManager.remove(prayerOverlay);
+        if (navButton != null) clientToolbar.removeNavigation(navButton);
+        navButton = null;
+        panel = null;
         state.clear();
         log.info("Phosani Helper stopped");
     }
@@ -75,6 +99,8 @@ public class PhosaniHelperPlugin extends Plugin {
      */
     @Subscribe
     public void onGameTick(GameTick event) {
+        refreshInventoryFlags();
+        updatePanel();
         // If we tracked her but she's gone/dead, clear everything
         if (state.getNightmare() != null) {
             // Tolerate a few ticks of absence (she may despawn/respawn when teleporting)
@@ -109,6 +135,7 @@ public class PhosaniHelperPlugin extends Plugin {
         // Surge lane expiry
         if (state.isSurgeActive() && now >= state.getSurgeExpiryTick()) {
             state.getSurgeTiles().clear();
+            state.setSurgeStartTile(null);
             if (state.getActiveSpecial() == PhosaniState.SpecialAttack.SURGE) {
                 state.setActiveSpecial(PhosaniState.SpecialAttack.NONE);
             }
@@ -130,26 +157,45 @@ public class PhosaniHelperPlugin extends Plugin {
         WorldPoint previous = state.getLastBossTile();
         state.setLastBossTile(current);
         if (previous == null || current == null || previous.getPlane() != current.getPlane()) return;
+
+        // While the lane is up: once she actually moves, snap the lane to her real
+        // movement axis (ground truth beats the teleport-based guess).
+        if (state.isSurgeActive() && state.getSurgeStartTile() != null) {
+            WorldPoint start = state.getSurgeStartTile();
+            if (PhosaniLogic.tileDistance(start, current) >= 2) {
+                int[] axis = PhosaniLogic.movementAxis(start, current);
+                if (axis != null) {
+                    setLane(boss, start, axis);
+                }
+            }
+            return;
+        }
+
         if (now < state.getSurgeCooldownUntil()) return;
 
         if (PhosaniLogic.tileDistance(previous, current) >= config.surgeJumpTiles()) {
-            int[] dir = PhosaniLogic.surgeDirection(previous, current);
-            if (dir != null) {
-                startSurge(boss, current, dir, now);
-                log.debug("Surge teleport detected {} -> {}, dir {},{}", previous, current, dir[0], dir[1]);
+            int[] axis = PhosaniLogic.surgeAxis(previous, current, config.surgePerpendicular());
+            if (axis != null) {
+                startSurge(boss, current, axis, now);
+                log.debug("Surge teleport detected {} -> {}, axis {},{}", previous, current, axis[0], axis[1]);
             }
         }
     }
 
-    private void startSurge(NPC boss, WorldPoint centre, int[] dir, int now) {
-        int size = boss.getComposition() != null ? boss.getComposition().getSize() : 5;
-        state.getSurgeTiles().clear();
-        state.getSurgeTiles().addAll(PhosaniLogic.surgeLane(centre, dir, size, config.surgeLaneLength()));
+    private void startSurge(NPC boss, WorldPoint centre, int[] axis, int now) {
+        state.setSurgeStartTile(centre);
+        setLane(boss, centre, axis);
         state.setSurgeExpiryTick(now + config.surgeShowTicks());
         // Ignore her landing on the far side and her return to the middle
         state.setSurgeCooldownUntil(now + config.surgeShowTicks() + 8);
         state.setActiveSpecial(PhosaniState.SpecialAttack.SURGE);
         state.setAutoAttackCount(0);
+    }
+
+    private void setLane(NPC boss, WorldPoint centre, int[] axis) {
+        int size = boss.getComposition() != null ? boss.getComposition().getSize() : 5;
+        state.getSurgeTiles().clear();
+        state.getSurgeTiles().addAll(PhosaniLogic.surgeLane(centre, axis, size, config.surgeLaneLength()));
     }
 
     /**
@@ -219,7 +265,7 @@ public class PhosaniHelperPlugin extends Plugin {
             // Optional trigger if the user found the real surge animation ID
             WorldPoint centre = WorldPoint.fromLocal(client, npc.getLocalLocation());
             if (centre != null) {
-                startSurge(npc, centre, PhosaniLogic.directionFromOrientation(npc.getOrientation()), tick);
+                startSurge(npc, centre, PhosaniLogic.axisFromOrientation(npc.getOrientation()), tick);
             }
 
         } else if (anim == config.animMushroom()) {
@@ -245,6 +291,9 @@ public class PhosaniHelperPlugin extends Plugin {
             state.setCursed(true);
             state.setCurseExpiryTick(client.getTickCount() + config.curseTimeoutTicks());
             log.debug("Curse ON");
+        } else if (msg.contains(PhosaniLogic.PARASITE_START)) {
+            refreshInventoryFlags();
+            state.setParasiteWarningUntil(client.getTickCount() + config.parasiteWarningTicks());
         } else if (msg.contains(PhosaniLogic.CURSE_END)) {
             state.setCursed(false);
             log.debug("Curse OFF");
@@ -280,7 +329,7 @@ public class PhosaniHelperPlugin extends Plugin {
     public void onGraphicsObjectCreated(GraphicsObjectCreated event) {
         if (!state.isActive()) return;
         int id = event.getGraphicsObject().getId();
-        if (id == config.gfxDarkness() || id == config.gfxParasite()) {
+        if (id == config.gfxDarkness()) {
             WorldPoint wp = WorldPoint.fromLocal(
                 client,
                 event.getGraphicsObject().getLocation()
@@ -325,5 +374,60 @@ public class PhosaniHelperPlugin extends Plugin {
         if ("phosanihelper".equals(event.getGroup()) && "npcIdPhosani".equals(event.getKey())) {
             phosaniIds = parseIds(config.npcIdPhosani());
         }
+    }
+
+    // ── Inventory (Relicym's balm / Sanfew serum, matched by name) ────────────
+
+    @Subscribe
+    public void onItemContainerChanged(ItemContainerChanged event) {
+        if (event.getContainerId() == InventoryID.INVENTORY.getId()) refreshInventoryFlags();
+    }
+
+    private void refreshInventoryFlags() {
+        ItemContainer inv = client.getItemContainer(InventoryID.INVENTORY);
+        boolean balm = false, sanfew = false;
+        if (inv != null) {
+            for (Item it : inv.getItems()) {
+                if (it == null || it.getId() <= 0) continue;
+                ItemComposition def = client.getItemDefinition(it.getId());
+                String name = def == null ? null : def.getName();
+                if (PhosaniLogic.isBalm(name)) balm = true;
+                else if (PhosaniLogic.isSanfew(name)) sanfew = true;
+            }
+        }
+        state.setInvHasBalm(balm);
+        state.setInvHasSanfew(sanfew);
+    }
+
+    // ── Side panel ────────────────────────────────────────────────────────────
+
+    private void updatePanel() {
+        final PhosaniPanel p = panel;
+        if (p == null) return;
+        final boolean active = state.getNightmare() != null;
+        final boolean cursed = state.isCursed();
+        final String attack = state.getLastAttack().name();
+        final String autos = active ? String.valueOf(4 - (state.getAutoAttackCount() % 4)) : "-";
+        final boolean surge = state.isSurgeActive();
+        final boolean parasite = client.getTickCount() < state.getParasiteWarningUntil();
+        final String parasiteTxt = parasite
+            ? PhosaniLogic.parasiteText(state.isInvHasBalm(), state.isInvHasSanfew()) : "no";
+        SwingUtilities.invokeLater(() -> p.update(active, cursed, attack, autos, surge, parasiteTxt));
+    }
+
+    /** Generated 16x16 "PNM" icon (no external assets). */
+    private static BufferedImage makeIcon() {
+        BufferedImage img = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        g.setColor(new Color(70, 30, 110));
+        g.fillRoundRect(0, 0, 16, 16, 4, 4);
+        g.setColor(new Color(190, 150, 255));
+        g.drawRoundRect(0, 0, 15, 15, 4, 4);
+        g.setFont(new Font("SansSerif", Font.BOLD, 8));
+        g.setColor(Color.WHITE);
+        g.drawString("PNM", 0, 11);
+        g.dispose();
+        return img;
     }
 }
