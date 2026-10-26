@@ -13,6 +13,7 @@ final class PhosaniLogic {
 
     static final String CURSE_START = "has cursed you";
     static final String CURSE_END   = "curse wear off";
+    static final String PARASITE_START = "impregnated you";
 
     /** The prayer to physically click while cursed to get the {@code needed} protection. */
     static Prayer prayerToClick(Prayer needed, PhosaniHelperConfig.CurseRotation rotation) {
@@ -36,17 +37,29 @@ final class PhosaniLogic {
     }
 
     /**
-     * Cardinal surge direction after she teleports from {@code before} to the edge tile {@code after}:
-     * she crosses back over the room, i.e. towards where she came from, snapped to the dominant axis.
-     * Returns {dx, dy}, or null if no movement.
+     * Surge axis after her edge teleport from {@code before} to {@code after}.
+     * Returns {1,0} (east-west lane) or {0,1} (north-south lane), or null if no movement.
+     * In-game testing showed the charge runs PERPENDICULAR to the teleport jump,
+     * so that is the default; {@code perpendicular=false} uses the jump axis.
      */
-    static int[] surgeDirection(WorldPoint before, WorldPoint after) {
-        int dx = before.getX() - after.getX();
-        int dy = before.getY() - after.getY();
+    static int[] surgeAxis(WorldPoint before, WorldPoint after, boolean perpendicular) {
+        int dx = Math.abs(after.getX() - before.getX());
+        int dy = Math.abs(after.getY() - before.getY());
         if (dx == 0 && dy == 0) return null;
-        return Math.abs(dx) >= Math.abs(dy)
-            ? new int[]{Integer.signum(dx), 0}
-            : new int[]{0, Integer.signum(dy)};
+        boolean jumpIsHorizontal = dx >= dy;
+        boolean laneHorizontal = perpendicular ? !jumpIsHorizontal : jumpIsHorizontal;
+        return laneHorizontal ? new int[]{1, 0} : new int[]{0, 1};
+    }
+
+    /** Axis of actual movement between two tiles (ground truth once she starts charging). */
+    static int[] movementAxis(WorldPoint from, WorldPoint to) {
+        return surgeAxis(from, to, false);
+    }
+
+    /** Axis from NPC orientation (0 = south, 512 = west, 1024 = north, 1536 = east). */
+    static int[] axisFromOrientation(int orientation) {
+        int[] d = directionFromOrientation(orientation);
+        return new int[]{Math.abs(d[0]), Math.abs(d[1])};
     }
 
     /** Direction from NPC orientation (0 = south, 512 = west, 1024 = north, 1536 = east). */
@@ -62,21 +75,31 @@ final class PhosaniLogic {
     }
 
     /**
-     * Lane tiles: starting at her centre tile, {@code length} tiles along {@code dir},
-     * {@code width} tiles wide (her size).
+     * Lane tiles: a full line through her centre tile along {@code axis}, {@code length} tiles
+     * each way (covers the whole room whichever way she charges), {@code width} tiles wide.
      */
-    static Set<WorldPoint> surgeLane(WorldPoint centre, int[] dir, int width, int length) {
+    static Set<WorldPoint> surgeLane(WorldPoint centre, int[] axis, int width, int length) {
         Set<WorldPoint> lane = new HashSet<>();
         int half = Math.max(0, width / 2);
-        int px = -dir[1], py = dir[0]; // perpendicular
-        for (int i = -half; i <= length; i++) {
+        int px = axis[1], py = axis[0]; // perpendicular
+        for (int i = -length; i <= length; i++) {
             for (int j = -half; j <= half; j++) {
                 lane.add(new WorldPoint(
-                    centre.getX() + dir[0] * i + px * j,
-                    centre.getY() + dir[1] * i + py * j,
+                    centre.getX() + axis[0] * i + px * j,
+                    centre.getY() + axis[1] * i + py * j,
                     centre.getPlane()));
             }
         }
         return lane;
+    }
+
+    /** Case-insensitive match of an NPC name against a comma-separated list. */
+    static boolean nameMatches(String npcName, String csv) {
+        if (npcName == null || csv == null) return false;
+        String n = npcName.trim().toLowerCase();
+        for (String part : csv.split(",")) {
+            if (!part.trim().isEmpty() && n.equals(part.trim().toLowerCase())) return true;
+        }
+        return false;
     }
 }

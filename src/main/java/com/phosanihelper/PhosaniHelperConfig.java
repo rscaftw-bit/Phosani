@@ -95,9 +95,25 @@ public interface PhosaniHelperConfig extends Config {
         description = "Graphics object ID of the darkness / shadow zone", position = 42)
     default int gfxDarkness() { return 1767; }
 
-    @ConfigItem(keyName = "gfxParasite", name = "Parasite graphic ID",
-        description = "Graphics object ID of the parasite orb", position = 43)
-    default int gfxParasite() { return 1765; }
+    // ── NPC highlight (parasites, sleepwalkers, husks) ────────────────────────
+
+    @ConfigItem(keyName = "highlightNpcs", name = "Highlight adds",
+        description = "Outline + tile on parasites, sleepwalkers and husks (matched by NPC name)", position = 6)
+    default boolean highlightNpcs() { return true; }
+
+    @ConfigItem(keyName = "highlightNames", name = "Add NPC names",
+        description = "Comma-separated NPC names to highlight", position = 7)
+    default String highlightNames() { return "Parasite,Sleepwalker,Husk"; }
+
+    @Alpha
+    @ConfigItem(keyName = "highlightColor", name = "Add highlight color",
+        description = "Color for highlighted adds", position = 14)
+    default Color highlightColor() { return new Color(0, 255, 255, 220); }
+
+    @Range(min = 5, max = 60)
+    @ConfigItem(keyName = "parasiteWarningTicks", name = "Parasite warning (ticks)",
+        description = "How long 'PARASITE - drink sanfew/relicym' shows after 'impregnated you' message", position = 43)
+    default int parasiteWarningTicks() { return 25; }
 
     // ── Curse ─────────────────────────────────────────────────────────────────
 
@@ -121,6 +137,11 @@ public interface PhosaniHelperConfig extends Config {
     default int curseTimeoutTicks() { return 50; }
 
     // ── Surge ─────────────────────────────────────────────────────────────────
+
+    @ConfigItem(keyName = "surgePerpendicular", name = "Surge: lane across teleport",
+        description = "On = lane perpendicular to her teleport jump (matches in-game test). "
+            + "The lane also snaps to her real movement once she starts charging.", position = 46)
+    default boolean surgePerpendicular() { return true; }
 
     @Range(min = 3, max = 20)
     @ConfigItem(keyName = "surgeJumpTiles", name = "Surge: teleport distance",

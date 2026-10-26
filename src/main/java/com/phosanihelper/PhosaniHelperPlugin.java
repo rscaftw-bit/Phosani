@@ -109,6 +109,7 @@ public class PhosaniHelperPlugin extends Plugin {
         // Surge lane expiry
         if (state.isSurgeActive() && now >= state.getSurgeExpiryTick()) {
             state.getSurgeTiles().clear();
+            state.setSurgeStartTile(null);
             if (state.getActiveSpecial() == PhosaniState.SpecialAttack.SURGE) {
                 state.setActiveSpecial(PhosaniState.SpecialAttack.NONE);
             }
@@ -130,26 +131,45 @@ public class PhosaniHelperPlugin extends Plugin {
         WorldPoint previous = state.getLastBossTile();
         state.setLastBossTile(current);
         if (previous == null || current == null || previous.getPlane() != current.getPlane()) return;
+
+        // While the lane is up: once she actually moves, snap the lane to her real
+        // movement axis (ground truth beats the teleport-based guess).
+        if (state.isSurgeActive() && state.getSurgeStartTile() != null) {
+            WorldPoint start = state.getSurgeStartTile();
+            if (PhosaniLogic.tileDistance(start, current) >= 2) {
+                int[] axis = PhosaniLogic.movementAxis(start, current);
+                if (axis != null) {
+                    setLane(boss, start, axis);
+                }
+            }
+            return;
+        }
+
         if (now < state.getSurgeCooldownUntil()) return;
 
         if (PhosaniLogic.tileDistance(previous, current) >= config.surgeJumpTiles()) {
-            int[] dir = PhosaniLogic.surgeDirection(previous, current);
-            if (dir != null) {
-                startSurge(boss, current, dir, now);
-                log.debug("Surge teleport detected {} -> {}, dir {},{}", previous, current, dir[0], dir[1]);
+            int[] axis = PhosaniLogic.surgeAxis(previous, current, config.surgePerpendicular());
+            if (axis != null) {
+                startSurge(boss, current, axis, now);
+                log.debug("Surge teleport detected {} -> {}, axis {},{}", previous, current, axis[0], axis[1]);
             }
         }
     }
 
-    private void startSurge(NPC boss, WorldPoint centre, int[] dir, int now) {
-        int size = boss.getComposition() != null ? boss.getComposition().getSize() : 5;
-        state.getSurgeTiles().clear();
-        state.getSurgeTiles().addAll(PhosaniLogic.surgeLane(centre, dir, size, config.surgeLaneLength()));
+    private void startSurge(NPC boss, WorldPoint centre, int[] axis, int now) {
+        state.setSurgeStartTile(centre);
+        setLane(boss, centre, axis);
         state.setSurgeExpiryTick(now + config.surgeShowTicks());
         // Ignore her landing on the far side and her return to the middle
         state.setSurgeCooldownUntil(now + config.surgeShowTicks() + 8);
         state.setActiveSpecial(PhosaniState.SpecialAttack.SURGE);
         state.setAutoAttackCount(0);
+    }
+
+    private void setLane(NPC boss, WorldPoint centre, int[] axis) {
+        int size = boss.getComposition() != null ? boss.getComposition().getSize() : 5;
+        state.getSurgeTiles().clear();
+        state.getSurgeTiles().addAll(PhosaniLogic.surgeLane(centre, axis, size, config.surgeLaneLength()));
     }
 
     /**
@@ -219,7 +239,7 @@ public class PhosaniHelperPlugin extends Plugin {
             // Optional trigger if the user found the real surge animation ID
             WorldPoint centre = WorldPoint.fromLocal(client, npc.getLocalLocation());
             if (centre != null) {
-                startSurge(npc, centre, PhosaniLogic.directionFromOrientation(npc.getOrientation()), tick);
+                startSurge(npc, centre, PhosaniLogic.axisFromOrientation(npc.getOrientation()), tick);
             }
 
         } else if (anim == config.animMushroom()) {
@@ -245,6 +265,8 @@ public class PhosaniHelperPlugin extends Plugin {
             state.setCursed(true);
             state.setCurseExpiryTick(client.getTickCount() + config.curseTimeoutTicks());
             log.debug("Curse ON");
+        } else if (msg.contains(PhosaniLogic.PARASITE_START)) {
+            state.setParasiteWarningUntil(client.getTickCount() + config.parasiteWarningTicks());
         } else if (msg.contains(PhosaniLogic.CURSE_END)) {
             state.setCursed(false);
             log.debug("Curse OFF");
@@ -280,7 +302,7 @@ public class PhosaniHelperPlugin extends Plugin {
     public void onGraphicsObjectCreated(GraphicsObjectCreated event) {
         if (!state.isActive()) return;
         int id = event.getGraphicsObject().getId();
-        if (id == config.gfxDarkness() || id == config.gfxParasite()) {
+        if (id == config.gfxDarkness()) {
             WorldPoint wp = WorldPoint.fromLocal(
                 client,
                 event.getGraphicsObject().getLocation()
