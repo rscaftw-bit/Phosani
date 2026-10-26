@@ -5,6 +5,11 @@ import net.runelite.api.NPC;
 import net.runelite.api.Prayer;
 import net.runelite.api.coords.WorldPoint;
 
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
 /**
  * Tracks Phosani's current state so both overlays read a single source of truth.
  */
@@ -12,47 +17,45 @@ import net.runelite.api.coords.WorldPoint;
 public class PhosaniState {
 
     public enum AttackStyle { NONE, MELEE, RANGED, MAGIC }
-    public enum SpecialAttack { NONE, DASH, PARASITES, MUSHROOMS, HUSKS, DARKNESS, CURSE }
+    public enum SpecialAttack { NONE, SURGE, PARASITES, MUSHROOMS }
 
     // The boss NPC (null when not in the fight)
     private NPC nightmare;
 
-    // What her last detected auto-attack was
     private AttackStyle lastAttack = AttackStyle.NONE;
-
-    // Which special is currently active
     private SpecialAttack activeSpecial = SpecialAttack.NONE;
 
-    // The prayer the player SHOULD be on right now
+    // Protection needed against her last attack (NOT remapped for the curse)
     private Prayer recommendedPrayer = null;
 
-    // Tick on which the last attack animation fired
     private int lastAttackTick = -1;
-
-    // Countdown: how many ticks ago the attack started (for fade-out of indicator)
     private int ticksSinceAttack = 0;
 
-    // During a DASH: the tile she is charging FROM (behind = safe side)
-    private WorldPoint dashOrigin = null;
-
     // Dangerous tiles (darkness zones, parasite orbs) → game tick on which they expire
-    private java.util.Map<WorldPoint, Integer> dangerTiles = new java.util.HashMap<>();
-
-    // Mushroom tiles that should be clicked
-    private java.util.Set<WorldPoint> mushroomTiles = new java.util.HashSet<>();
-
-    // Count of attacks in current 4-attack cycle (resets on special)
+    private Map<WorldPoint, Integer> dangerTiles = new HashMap<>();
+    private Set<WorldPoint> mushroomTiles = new HashSet<>();
     private int autoAttackCount = 0;
 
-    // True while she is doing a dash animation
-    private boolean dashing = false;
+    // ── Surge ────────────────────────────────────────────────────────────────
+    // Boss centre tile on the previous game tick (used to detect her edge teleport)
+    private WorldPoint lastBossTile = null;
+    // Tiles of the lane she is about to surge through
+    private Set<WorldPoint> surgeTiles = new HashSet<>();
+    private int surgeExpiryTick = -1;
+    // Ignore further position jumps until this tick (her landing / walking back)
+    private int surgeCooldownUntil = -1;
 
-    // --------------------------------------------------------------
-    // Helpers
-    // --------------------------------------------------------------
+    // ── Curse ────────────────────────────────────────────────────────────────
+    private boolean cursed = false;
+    // Safety timeout in case the "wear off" chat message is missed
+    private int curseExpiryTick = -1;
 
     public boolean isActive() {
         return nightmare != null && !nightmare.isDead();
+    }
+
+    public boolean isSurgeActive() {
+        return !surgeTiles.isEmpty();
     }
 
     public void clear() {
@@ -62,21 +65,22 @@ public class PhosaniState {
         recommendedPrayer = null;
         lastAttackTick = -1;
         ticksSinceAttack = 0;
-        dashOrigin = null;
         dangerTiles.clear();
         mushroomTiles.clear();
         autoAttackCount = 0;
-        dashing = false;
+        lastBossTile = null;
+        surgeTiles.clear();
+        surgeExpiryTick = -1;
+        surgeCooldownUntil = -1;
+        cursed = false;
+        curseExpiryTick = -1;
     }
 
     public void incrementTicksSinceAttack() {
         ticksSinceAttack++;
     }
 
-    /**
-     * True if the prayer indicator should still be visible
-     * (fades after 3 ticks to avoid screen clutter).
-     */
+    /** True if the prayer indicator should still be visible (fades after 3 ticks). */
     public boolean isPrayerIndicatorActive() {
         return ticksSinceAttack <= 3 && recommendedPrayer != null;
     }

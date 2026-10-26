@@ -12,6 +12,7 @@ import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayManager;
+import net.runelite.client.util.Text;
 
 import javax.inject.Inject;
 import java.util.HashSet;
@@ -20,7 +21,7 @@ import java.util.Set;
 @Slf4j
 @PluginDescriptor(
     name       = "Phosani Helper",
-    description = "Tile overlays, prayer helper & dash indicator for Phosani's Nightmare",
+    description = "Tile overlays, prayer helper & surge lane for Phosani's Nightmare",
     tags       = {"phosani", "nightmare", "prayer", "overlay", "boss", "helper"}
 )
 public class PhosaniHelperPlugin extends Plugin {
@@ -39,6 +40,9 @@ public class PhosaniHelperPlugin extends Plugin {
 
     /** Parsed set of Phosani NPC IDs from config (supports multiple phase IDs). */
     private Set<Integer> phosaniIds;
+
+    /** Consecutive ticks Phosani was not found in the scene. */
+    private int missingTicks = 0;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -73,9 +77,14 @@ public class PhosaniHelperPlugin extends Plugin {
     public void onGameTick(GameTick event) {
         // If we tracked her but she's gone/dead, clear everything
         if (state.getNightmare() != null) {
-            if (state.getNightmare().isDead() || !isPhosaniNearby()) {
-                log.debug("Phosani gone – clearing state");
-                state.clear();
+            // Tolerate a few ticks of absence (she may despawn/respawn when teleporting)
+            missingTicks = isPhosaniNearby() ? 0 : missingTicks + 1;
+            if (missingTicks > 0) {
+                if (missingTicks >= 5) {
+                    log.debug("Phosani gone – clearing state");
+                    state.clear();
+                    missingTicks = 0;
+                }
                 return;
             }
         }
@@ -91,6 +100,56 @@ public class PhosaniHelperPlugin extends Plugin {
         if (state.getAutoAttackCount() > 4) {
             state.setAutoAttackCount(0);
         }
+
+        // Curse safety timeout (normally ended by the "wear off" chat message)
+        if (state.isCursed() && now >= state.getCurseExpiryTick()) {
+            state.setCursed(false);
+        }
+
+        // Surge lane expiry
+        if (state.isSurgeActive() && now >= state.getSurgeExpiryTick()) {
+            state.getSurgeTiles().clear();
+            if (state.getActiveSpecial() == PhosaniState.SpecialAttack.SURGE) {
+                state.setActiveSpecial(PhosaniState.SpecialAttack.NONE);
+            }
+        }
+
+        detectSurgeTeleport(now);
+    }
+
+    /**
+     * Surge: she teleports to one of the four edges, then charges straight across.
+     * We detect the teleport as a big one-tick position jump and draw the lane
+     * from her new position back across the room.
+     */
+    private void detectSurgeTeleport(int now) {
+        NPC boss = state.getNightmare();
+        if (boss == null || boss.getLocalLocation() == null) return;
+
+        WorldPoint current = WorldPoint.fromLocal(client, boss.getLocalLocation());
+        WorldPoint previous = state.getLastBossTile();
+        state.setLastBossTile(current);
+        if (previous == null || current == null || previous.getPlane() != current.getPlane()) return;
+        if (now < state.getSurgeCooldownUntil()) return;
+
+        if (PhosaniLogic.tileDistance(previous, current) >= config.surgeJumpTiles()) {
+            int[] dir = PhosaniLogic.surgeDirection(previous, current);
+            if (dir != null) {
+                startSurge(boss, current, dir, now);
+                log.debug("Surge teleport detected {} -> {}, dir {},{}", previous, current, dir[0], dir[1]);
+            }
+        }
+    }
+
+    private void startSurge(NPC boss, WorldPoint centre, int[] dir, int now) {
+        int size = boss.getComposition() != null ? boss.getComposition().getSize() : 5;
+        state.getSurgeTiles().clear();
+        state.getSurgeTiles().addAll(PhosaniLogic.surgeLane(centre, dir, size, config.surgeLaneLength()));
+        state.setSurgeExpiryTick(now + config.surgeShowTicks());
+        // Ignore her landing on the far side and her return to the middle
+        state.setSurgeCooldownUntil(now + config.surgeShowTicks() + 8);
+        state.setActiveSpecial(PhosaniState.SpecialAttack.SURGE);
+        state.setAutoAttackCount(0);
     }
 
     /**
@@ -101,7 +160,11 @@ public class PhosaniHelperPlugin extends Plugin {
         NPC npc = event.getNpc();
         if (phosaniIds.contains(npc.getId())) {
             log.debug("Phosani detected (NPC id {})", npc.getId());
-            state.clear();
+            // Only reset when entering a new fight; a re-spawn mid-fight (e.g. teleport)
+            // must keep curse / position tracking.
+            if (!state.isActive()) {
+                state.clear();
+            }
             state.setNightmare(npc);
         }
     }
@@ -152,30 +215,39 @@ public class PhosaniHelperPlugin extends Plugin {
             state.setActiveSpecial(PhosaniState.SpecialAttack.NONE);
             countAutoAttack(tick);
 
-        } else if (anim == config.animDash()) {
-            state.setActiveSpecial(PhosaniState.SpecialAttack.DASH);
-            state.setDashing(true);
-            // Record where she is right now so the overlay can draw the safe side
-            // Scene coordinates (instance-safe) to match the overlay's LocalPoint.fromWorld
-            WorldPoint origin = WorldPoint.fromLocal(client, npc.getLocalLocation());
-            state.setDashOrigin(origin);
-            state.setAutoAttackCount(0);   // specials reset the auto cycle
-            log.debug("Dash detected – origin {}", origin);
+        } else if (config.animSurge() > 0 && anim == config.animSurge() && !state.isSurgeActive()) {
+            // Optional trigger if the user found the real surge animation ID
+            WorldPoint centre = WorldPoint.fromLocal(client, npc.getLocalLocation());
+            if (centre != null) {
+                startSurge(npc, centre, PhosaniLogic.directionFromOrientation(npc.getOrientation()), tick);
+            }
 
         } else if (anim == config.animMushroom()) {
             state.setActiveSpecial(PhosaniState.SpecialAttack.MUSHROOMS);
-            state.setDashing(false);
             state.setAutoAttackCount(0);
 
         } else if (anim == config.animParasite()) {
             state.setActiveSpecial(PhosaniState.SpecialAttack.PARASITES);
-            state.setDashing(false);
             state.setAutoAttackCount(0);
         }
+    }
 
-        // Clear dash flag if she started a new, non-dash animation
-        if (anim != config.animDash() && state.isDashing()) {
-            state.setDashing(false);
+    /**
+     * Curse on/off from the game's own chat messages:
+     *  "The Nightmare has cursed you, shuffling your prayers!"
+     *  "You feel the effects of the Nightmare's curse wear off."
+     */
+    @Subscribe
+    public void onChatMessage(ChatMessage event) {
+        if (event.getType() != ChatMessageType.GAMEMESSAGE && event.getType() != ChatMessageType.SPAM) return;
+        String msg = Text.removeTags(event.getMessage());
+        if (msg.contains(PhosaniLogic.CURSE_START)) {
+            state.setCursed(true);
+            state.setCurseExpiryTick(client.getTickCount() + config.curseTimeoutTicks());
+            log.debug("Curse ON");
+        } else if (msg.contains(PhosaniLogic.CURSE_END)) {
+            state.setCursed(false);
+            log.debug("Curse OFF");
         }
     }
 
@@ -252,24 +324,6 @@ public class PhosaniHelperPlugin extends Plugin {
     public void onConfigChanged(ConfigChanged event) {
         if ("phosanihelper".equals(event.getGroup()) && "npcIdPhosani".equals(event.getKey())) {
             phosaniIds = parseIds(config.npcIdPhosani());
-        }
-    }
-
-    // ── Curse detection ───────────────────────────────────────────────────────
-
-    /**
-     * When Phosani's curse graphic appears on the local player's tile, notify
-     * the prayer overlay so it remaps the prayer recommendation for 5 ticks.
-     * Curse spot-anim ID is configurable (default 1769 – verify in-game).
-     */
-    @Subscribe
-    public void onGraphicChanged(GraphicChanged event) {
-        if (!(event.getActor() instanceof net.runelite.api.Player)) return;
-        net.runelite.api.Player p = (net.runelite.api.Player) event.getActor();
-        // Only care about the local player
-        if (!p.equals(client.getLocalPlayer())) return;
-        if (p.hasSpotAnim(config.gfxCurse())) {
-            prayerOverlay.onCurseApplied();
         }
     }
 }

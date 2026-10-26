@@ -13,9 +13,9 @@ public interface PhosaniHelperConfig extends Config {
         description = "Show large prayer icon with 1-tick early warning", position = 0)
     default boolean showPrayerHelper() { return true; }
 
-    @ConfigItem(keyName = "showDashOverlay", name = "Dash safe-side overlay",
-        description = "Red line + green tile showing the safe side during her dash", position = 1)
-    default boolean showDashOverlay() { return true; }
+    @ConfigItem(keyName = "showSurgeOverlay", name = "Surge lane overlay",
+        description = "Red lane across the room where she will surge after teleporting to an edge", position = 1)
+    default boolean showSurgeOverlay() { return true; }
 
     @ConfigItem(keyName = "showMushroomOverlay", name = "Mushroom tiles",
         description = "Highlight mushroom tiles during spore phase", position = 2)
@@ -36,14 +36,9 @@ public interface PhosaniHelperConfig extends Config {
     // ── Colours ──────────────────────────────────────────────────────────────
 
     @Alpha
-    @ConfigItem(keyName = "dashLineColor", name = "Dash line color",
-        description = "Color of the dash-direction indicator line", position = 10)
-    default Color dashLineColor() { return new Color(255, 30, 30, 220); }
-
-    @Alpha
-    @ConfigItem(keyName = "safeTileColor", name = "Safe tile color",
-        description = "Color of the safe tile during dash", position = 11)
-    default Color safeTileColor() { return new Color(30, 255, 80, 180); }
+    @ConfigItem(keyName = "surgeColor", name = "Surge lane color",
+        description = "Color of the surge lane (do not stand here)", position = 10)
+    default Color surgeColor() { return new Color(255, 0, 255, 90); }
 
     @Alpha
     @ConfigItem(keyName = "mushroomColor", name = "Mushroom tile color",
@@ -80,10 +75,6 @@ public interface PhosaniHelperConfig extends Config {
         description = "Phosani parasite attack animation", position = 33)
     default int animParasite() { return 8597; }
 
-    @ConfigItem(keyName = "animDash", name = "Dash animation ID",
-        description = "Phosani dash/charge animation", position = 34)
-    default int animDash() { return 8600; }
-
     @ConfigItem(keyName = "animMushroom", name = "Mushroom phase animation ID",
         description = "Phosani mushroom-phase animation", position = 35)
     default int animMushroom() { return 8598; }
@@ -108,14 +99,47 @@ public interface PhosaniHelperConfig extends Config {
         description = "Graphics object ID of the parasite orb", position = 43)
     default int gfxParasite() { return 1765; }
 
-    @ConfigItem(keyName = "gfxCurse", name = "Curse spot-anim ID",
-        description = "Spot animation ID on the local player when cursed", position = 44)
-    default int gfxCurse() { return 1769; }
+    // ── Curse ─────────────────────────────────────────────────────────────────
 
-    @Range(min = 1, max = 50)
-    @ConfigItem(keyName = "curseDurationTicks", name = "Curse duration (ticks)",
-        description = "How long the curse remap stays active after detection", position = 45)
-    default int curseDurationTicks() { return 5; }
+    enum CurseRotation {
+        NEED_MELEE_CLICK_MAGIC("Melee→Magic, Magic→Range, Range→Melee"),
+        NEED_MELEE_CLICK_RANGE("Melee→Range, Magic→Melee, Range→Magic (wiki)");
+
+        private final String label;
+        CurseRotation(String label) { this.label = label; }
+        @Override public String toString() { return label; }
+    }
+
+    @ConfigItem(keyName = "curseRotation", name = "Curse: needed → click",
+        description = "Which prayer to click while cursed, per needed protection. "
+            + "Detected from the 'has cursed you' / 'curse wear off' chat messages.", position = 44)
+    default CurseRotation curseRotation() { return CurseRotation.NEED_MELEE_CLICK_MAGIC; }
+
+    @Range(min = 10, max = 200)
+    @ConfigItem(keyName = "curseTimeoutTicks", name = "Curse safety timeout (ticks)",
+        description = "Drop the curse mode after this many ticks if the wear-off message is missed", position = 45)
+    default int curseTimeoutTicks() { return 50; }
+
+    // ── Surge ─────────────────────────────────────────────────────────────────
+
+    @Range(min = 3, max = 20)
+    @ConfigItem(keyName = "surgeJumpTiles", name = "Surge: teleport distance",
+        description = "A position jump of at least this many tiles in one tick counts as her edge teleport", position = 47)
+    default int surgeJumpTiles() { return 5; }
+
+    @Range(min = 2, max = 20)
+    @ConfigItem(keyName = "surgeShowTicks", name = "Surge: lane duration (ticks)",
+        description = "How long the surge lane stays drawn after the teleport", position = 48)
+    default int surgeShowTicks() { return 5; }
+
+    @Range(min = 10, max = 40)
+    @ConfigItem(keyName = "surgeLaneLength", name = "Surge: lane length (tiles)",
+        description = "How far across the room the lane is drawn", position = 49)
+    default int surgeLaneLength() { return 20; }
+
+    @ConfigItem(keyName = "animSurge", name = "Surge animation ID (optional)",
+        description = "-1 = off. If set, this animation also triggers the lane (direction from her facing)", position = 50)
+    default int animSurge() { return -1; }
 
     @Range(min = 1, max = 20)
     @ConfigItem(keyName = "dangerTileTicks", name = "Danger tile duration (ticks)",

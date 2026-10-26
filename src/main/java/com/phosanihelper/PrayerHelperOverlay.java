@@ -11,24 +11,8 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 
 /**
- * Top-left HUD overlay showing:
- *  ┌─────────────────────────────────┐
- *  │  [CURSED]  ← orange banner if cursed
- *  │  [Prayer icon]  MAGIC           │
- *  │  Click: [icon you actually click]│  ← differs when cursed
- *  │  3 autos until special          │
- *  └─────────────────────────────────┘
- *
- * CURSE REMAP:
- *  When the player is cursed, Phosani's curse rotates prayer overhead icons
- *  one position counter-clockwise:
- *    To overhead MELEE  → you must click MAGIC
- *    To overhead MAGIC  → you must click RANGED
- *    To overhead RANGED → you must click MELEE
- *
- *  The overlay always shows:
- *   • Top row  = what overhead is needed (correct protection)
- *   • Bottom row = what icon you physically click in the prayer book
+ * Top-left HUD: the protection prayer to use. While cursed (detected from chat)
+ * the big icon is the prayer to physically CLICK, remapped per config.
  */
 public class PrayerHelperOverlay extends Overlay {
 
@@ -36,9 +20,6 @@ public class PrayerHelperOverlay extends Overlay {
     private final PhosaniHelperPlugin plugin;
     private final PhosaniHelperConfig config;
     private final SpriteManager spriteManager;
-
-    // Curse tracking
-    private int curseExpiryTick = -1;
 
     @Inject
     public PrayerHelperOverlay(Client client,
@@ -55,129 +36,83 @@ public class PrayerHelperOverlay extends Overlay {
         setPriority(OverlayPriority.HIGHEST);
     }
 
-    // ── Called by plugin when the curse graphic is detected on the local player ─
-
-    public void onCurseApplied() {
-        curseExpiryTick = client.getTickCount() + config.curseDurationTicks();
-    }
-
     // ── Rendering ─────────────────────────────────────────────────────────────
 
     @Override
     public Dimension render(Graphics2D g) {
         PhosaniState state = plugin.getState();
         if (!config.showPrayerHelper() || !state.isActive()) return null;
-        if (!state.isPrayerIndicatorActive() && !isCursed()) return null;
+
+        boolean cursed = state.isCursed();
+        Prayer needed = state.isPrayerIndicatorActive() ? state.getRecommendedPrayer() : null;
+        if (needed == null && !cursed) return null;
 
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-        boolean cursed = isCursed();
-        Prayer needed  = state.getRecommendedPrayer();
-        Prayer toClick = cursed ? remapForCurse(needed) : needed;
+        // While cursed the big icon is the prayer you physically CLICK.
+        Prayer shown = cursed ? PhosaniLogic.prayerToClick(needed, config.curseRotation()) : needed;
 
-        int iconSize  = config.prayerIconSize();
-        int padding   = 8;
-        int panelW    = iconSize + padding * 2 + (cursed ? 20 : 0);
-        int panelH    = (cursed ? 28 : 0)       // curse banner
-                      + (needed != null ? iconSize + 24 : 0)   // needed icon + label
-                      + (cursed && toClick != null ? iconSize / 2 + 20 : 0) // click icon
-                      + padding * 2;
+        int iconSize = config.prayerIconSize();
+        int padding  = 8;
+        int panelW   = Math.max(iconSize, 150) + padding * 2;
+        int panelH   = padding * 2
+            + 20                                   // header
+            + (shown != null ? iconSize + 24 : 0)  // icon + label
+            + (cursed && needed != null ? 16 : 0)  // "blocks X" line
+            + (cursed && needed == null ? 48 : 0)  // mapping table
+            + (config.showAutoCountdown() ? 16 : 0);
 
-        int x = padding;
-        int y = padding;
-
-        // Panel background
+        int x = padding, y = padding;
         g.setColor(new Color(0, 0, 0, 180));
         g.fillRoundRect(x, y, panelW, panelH, 10, 10);
-        g.setColor(new Color(255, 165, 0, 220));
-        g.setStroke(new BasicStroke(2));
+        g.setColor(cursed ? new Color(255, 60, 0, 230) : new Color(255, 165, 0, 220));
+        g.setStroke(new BasicStroke(cursed ? 3 : 2));
         g.drawRoundRect(x, y, panelW, panelH, 10, 10);
 
         int cx = x + padding;
         int cy = y + padding;
 
-        // ── CURSED banner ──────────────────────────────────────────────────
-        if (cursed) {
-            g.setFont(new Font("Arial", Font.BOLD, 14));
-            g.setColor(new Color(255, 80, 0));
-            String curseText = "! CURSED - PRAYERS ROTATED";
-            g.drawString(curseText, cx, cy + 16);
-            cy += 28;
-        }
+        g.setFont(new Font("Arial", Font.BOLD, 13));
+        g.setColor(cursed ? new Color(255, 90, 0) : Color.LIGHT_GRAY);
+        g.drawString(cursed ? "CURSED - CLICK:" : "PRAY:", cx, cy + 14);
+        cy += 20;
 
-        // ── Needed prayer icon (what protection you need) ─────────────────
-        if (needed != null) {
-            // Header label
-            g.setFont(new Font("Arial", Font.BOLD, 12));
-            g.setColor(Color.LIGHT_GRAY);
-            g.drawString("PROTECT FROM:", cx, cy + 13);
-            cy += 18;
-
-            // Prayer icon
-            renderPrayerIcon(g, needed, cx, cy, iconSize);
-
-            // Attack-style text
+        if (shown != null) {
+            renderPrayerIcon(g, shown, cx, cy, iconSize);
             if (config.showAttackStyleText()) {
                 g.setFont(new Font("Arial", Font.BOLD, 16));
-                g.setColor(prayerColor(needed));
-                String label = prayerLabel(needed);
+                g.setColor(prayerColor(shown));
+                String label = prayerLabel(shown);
                 g.drawString(label, cx + iconSize / 2 - g.getFontMetrics().stringWidth(label) / 2, cy + iconSize + 16);
             }
-            cy += iconSize + 22;
+            cy += iconSize + 24;
         }
 
-        // ── Click hint (different from needed when cursed) ────────────────
-        if (cursed && toClick != null && toClick != needed) {
-            g.setFont(new Font("Arial", Font.BOLD, 11));
-            g.setColor(new Color(255, 220, 50));
-            g.drawString("CLICK THIS ICON →", cx, cy + 11);
-            cy += 15;
-
-            int smallSize = iconSize / 2;
-            renderPrayerIcon(g, toClick, cx, cy, smallSize);
-
+        if (cursed && needed != null) {
+            g.setFont(new Font("Arial", Font.PLAIN, 11));
+            g.setColor(Color.LIGHT_GRAY);
+            g.drawString("(blocks her " + prayerLabel(needed).toLowerCase() + " attack)", cx, cy + 11);
+            cy += 16;
+        } else if (cursed) {
+            // No attack seen yet: show the full remap so you can pre-pray
             g.setFont(new Font("Arial", Font.BOLD, 12));
-            g.setColor(prayerColor(toClick));
-            String clickLabel = prayerLabel(toClick);
-            g.drawString(clickLabel, cx + smallSize + 4, cy + smallSize / 2 + 5);
-            cy += smallSize + 6;
+            Prayer[] all = {Prayer.PROTECT_FROM_MELEE, Prayer.PROTECT_FROM_MAGIC, Prayer.PROTECT_FROM_MISSILES};
+            for (Prayer need : all) {
+                Prayer click = PhosaniLogic.prayerToClick(need, config.curseRotation());
+                g.setColor(prayerColor(click));
+                g.drawString(prayerLabel(need) + " attack \u2192 click " + prayerLabel(click), cx, cy + 12);
+                cy += 16;
+            }
         }
 
-        // ── Auto-attack countdown ─────────────────────────────────────────
-        if (config.showAutoCountdown() && state.isActive()) {
+        if (config.showAutoCountdown()) {
             int autosLeft = 4 - (state.getAutoAttackCount() % 4);
             g.setFont(new Font("Arial", Font.PLAIN, 11));
             g.setColor(autosLeft == 1 ? Color.RED : Color.WHITE);
-            String cntText = autosLeft + " auto" + (autosLeft == 1 ? "" : "s") + " → special";
-            g.drawString(cntText, cx, cy + 12);
+            g.drawString(autosLeft + " auto" + (autosLeft == 1 ? "" : "s") + " \u2192 special", cx, cy + 12);
         }
 
         return new Dimension(panelW + padding * 2, panelH + padding * 2);
-    }
-
-    // ── Curse logic ───────────────────────────────────────────────────────────
-
-    public boolean isCursed() {
-        return client.getTickCount() < curseExpiryTick;
-    }
-
-    /**
-     * Phosani's curse rotates overhead prayers one slot counter-clockwise:
-     *   Overhead MELEE  = prayer slot that was MAGIC
-     *   Overhead MAGIC  = prayer slot that was RANGED
-     *   Overhead RANGED = prayer slot that was MELEE
-     *
-     * So to achieve the needed overhead, you click the prayer one step "back":
-     *   Need MELEE  → click MAGIC
-     *   Need MAGIC  → click RANGED
-     *   Need RANGED → click MELEE
-     */
-    private Prayer remapForCurse(Prayer needed) {
-        if (needed == null) return null;
-        if (needed == Prayer.PROTECT_FROM_MELEE)    return Prayer.PROTECT_FROM_MAGIC;
-        if (needed == Prayer.PROTECT_FROM_MAGIC)    return Prayer.PROTECT_FROM_MISSILES;
-        if (needed == Prayer.PROTECT_FROM_MISSILES) return Prayer.PROTECT_FROM_MELEE;
-        return needed;
     }
 
     // ── Icon rendering ────────────────────────────────────────────────────────
