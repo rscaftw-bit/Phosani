@@ -83,4 +83,14 @@ public class PhosaniLogicTest {
         assertArrayEquals(new int[]{1, 0},  PhosaniLogic.directionFromOrientation(1536));
         assertArrayEquals(new int[]{0, 1},  PhosaniLogic.axisFromOrientation(1024));
     }
+
+    @org.junit.Test
+    public void parasiteTextPrefersBalm() {
+        org.junit.Assert.assertTrue(PhosaniLogic.parasiteText(true, true).contains("Relicym"));
+        org.junit.Assert.assertTrue(PhosaniLogic.parasiteText(false, true).contains("Sanfew"));
+        org.junit.Assert.assertTrue(PhosaniLogic.parasiteText(false, false).contains("no Sanfew"));
+        org.junit.Assert.assertTrue(PhosaniLogic.isBalm("Relicym's balm(3)"));
+        org.junit.Assert.assertTrue(PhosaniLogic.isSanfew("Sanfew serum(4)"));
+        org.junit.Assert.assertFalse(PhosaniLogic.isSanfew("Super restore(4)"));
+    }
 }

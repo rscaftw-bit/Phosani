@@ -11,7 +11,16 @@ import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
+import net.runelite.client.ui.ClientToolbar;
+import net.runelite.client.ui.NavigationButton;
 import net.runelite.client.ui.overlay.OverlayManager;
+import net.runelite.client.util.ImageUtil;
+import javax.swing.SwingUtilities;
+import java.awt.Color;
+import java.awt.Font;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.image.BufferedImage;
 import net.runelite.client.util.Text;
 
 import javax.inject.Inject;
@@ -33,6 +42,10 @@ public class PhosaniHelperPlugin extends Plugin {
     @Inject private PhosaniHelperOverlay tileOverlay;
     @Inject private PrayerHelperOverlay prayerOverlay;
     @Inject private PhosaniHelperConfig config;
+    @Inject private ClientToolbar clientToolbar;
+
+    private PhosaniPanel panel;
+    private NavigationButton navButton;
 
     // ── Shared state ──────────────────────────────────────────────────────────
 
@@ -51,6 +64,14 @@ public class PhosaniHelperPlugin extends Plugin {
         phosaniIds = parseIds(config.npcIdPhosani());
         overlayManager.add(tileOverlay);
         overlayManager.add(prayerOverlay);
+        panel = new PhosaniPanel();
+        navButton = NavigationButton.builder()
+            .tooltip("Phosani's Nightmare")
+            .icon(makeIcon())
+            .priority(7)
+            .panel(panel)
+            .build();
+        clientToolbar.addNavigation(navButton);
         log.info("Phosani Helper started – watching NPC IDs: {}", phosaniIds);
     }
 
@@ -58,6 +79,9 @@ public class PhosaniHelperPlugin extends Plugin {
     protected void shutDown() {
         overlayManager.remove(tileOverlay);
         overlayManager.remove(prayerOverlay);
+        if (navButton != null) clientToolbar.removeNavigation(navButton);
+        navButton = null;
+        panel = null;
         state.clear();
         log.info("Phosani Helper stopped");
     }
@@ -75,6 +99,8 @@ public class PhosaniHelperPlugin extends Plugin {
      */
     @Subscribe
     public void onGameTick(GameTick event) {
+        refreshInventoryFlags();
+        updatePanel();
         // If we tracked her but she's gone/dead, clear everything
         if (state.getNightmare() != null) {
             // Tolerate a few ticks of absence (she may despawn/respawn when teleporting)
@@ -266,6 +292,7 @@ public class PhosaniHelperPlugin extends Plugin {
             state.setCurseExpiryTick(client.getTickCount() + config.curseTimeoutTicks());
             log.debug("Curse ON");
         } else if (msg.contains(PhosaniLogic.PARASITE_START)) {
+            refreshInventoryFlags();
             state.setParasiteWarningUntil(client.getTickCount() + config.parasiteWarningTicks());
         } else if (msg.contains(PhosaniLogic.CURSE_END)) {
             state.setCursed(false);
@@ -347,5 +374,60 @@ public class PhosaniHelperPlugin extends Plugin {
         if ("phosanihelper".equals(event.getGroup()) && "npcIdPhosani".equals(event.getKey())) {
             phosaniIds = parseIds(config.npcIdPhosani());
         }
+    }
+
+    // ── Inventory (Relicym's balm / Sanfew serum, matched by name) ────────────
+
+    @Subscribe
+    public void onItemContainerChanged(ItemContainerChanged event) {
+        if (event.getContainerId() == InventoryID.INVENTORY.getId()) refreshInventoryFlags();
+    }
+
+    private void refreshInventoryFlags() {
+        ItemContainer inv = client.getItemContainer(InventoryID.INVENTORY);
+        boolean balm = false, sanfew = false;
+        if (inv != null) {
+            for (Item it : inv.getItems()) {
+                if (it == null || it.getId() <= 0) continue;
+                ItemComposition def = client.getItemDefinition(it.getId());
+                String name = def == null ? null : def.getName();
+                if (PhosaniLogic.isBalm(name)) balm = true;
+                else if (PhosaniLogic.isSanfew(name)) sanfew = true;
+            }
+        }
+        state.setInvHasBalm(balm);
+        state.setInvHasSanfew(sanfew);
+    }
+
+    // ── Side panel ────────────────────────────────────────────────────────────
+
+    private void updatePanel() {
+        final PhosaniPanel p = panel;
+        if (p == null) return;
+        final boolean active = state.getNightmare() != null;
+        final boolean cursed = state.isCursed();
+        final String attack = state.getLastAttack().name();
+        final String autos = active ? String.valueOf(4 - (state.getAutoAttackCount() % 4)) : "-";
+        final boolean surge = state.isSurgeActive();
+        final boolean parasite = client.getTickCount() < state.getParasiteWarningUntil();
+        final String parasiteTxt = parasite
+            ? PhosaniLogic.parasiteText(state.isInvHasBalm(), state.isInvHasSanfew()) : "no";
+        SwingUtilities.invokeLater(() -> p.update(active, cursed, attack, autos, surge, parasiteTxt));
+    }
+
+    /** Generated 16x16 "PNM" icon (no external assets). */
+    private static BufferedImage makeIcon() {
+        BufferedImage img = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        g.setColor(new Color(70, 30, 110));
+        g.fillRoundRect(0, 0, 16, 16, 4, 4);
+        g.setColor(new Color(190, 150, 255));
+        g.drawRoundRect(0, 0, 15, 15, 4, 4);
+        g.setFont(new Font("SansSerif", Font.BOLD, 8));
+        g.setColor(Color.WHITE);
+        g.drawString("PNM", 0, 11);
+        g.dispose();
+        return img;
     }
 }

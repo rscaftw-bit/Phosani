@@ -72,14 +72,14 @@ public class PhosaniHelperOverlay extends Overlay {
 
         // ── 2c. Parasite-in-you warning (from chat message) ───────────────────
         if (client.getTickCount() < state.getParasiteWarningUntil() && client.getLocalPlayer() != null) {
-            String t = "PARASITE - drink sanfew / relicym";
+            String t = PhosaniLogic.parasiteText(state.isInvHasBalm(), state.isInvHasSanfew());
             net.runelite.api.Point loc = client.getLocalPlayer()
                 .getCanvasTextLocation(g, t, client.getLocalPlayer().getLogicalHeight() + 60);
             if (loc != null) {
                 g.setFont(new Font("Arial", Font.BOLD, 14));
                 g.setColor(Color.BLACK);
                 g.drawString(t, loc.getX() + 1, loc.getY() + 1);
-                g.setColor(Color.YELLOW);
+                g.setColor((state.isInvHasBalm() || state.isInvHasSanfew()) ? Color.YELLOW : Color.RED);
                 g.drawString(t, loc.getX(), loc.getY());
             }
         }

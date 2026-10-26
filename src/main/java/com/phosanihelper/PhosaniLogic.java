@@ -102,4 +102,22 @@ final class PhosaniLogic {
         }
         return false;
     }
+
+    /**
+     * Text shown above the player while a parasite is inside them.
+     * Clicking the Hitpoints orb uses Relicym's balm before Sanfew serum.
+     */
+    static String parasiteText(boolean hasBalm, boolean hasSanfew) {
+        if (hasBalm) return "PARASITE: click HITPOINTS orb (uses Relicym's balm)";
+        if (hasSanfew) return "PARASITE: click HITPOINTS orb (drinks Sanfew serum)";
+        return "PARASITE: no Sanfew / Relicym's in inventory!";
+    }
+
+    static boolean isBalm(String name) {
+        return name != null && name.toLowerCase().startsWith("relicym's balm");
+    }
+
+    static boolean isSanfew(String name) {
+        return name != null && name.toLowerCase().startsWith("sanfew serum");
+    }
 }

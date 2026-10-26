@@ -55,6 +55,8 @@ public class PhosaniState {
     // ── Parasite ─────────────────────────────────────────────────────────────
     // Show "PARASITE IN YOU" until this tick (set from the chat message)
     private int parasiteWarningUntil = -1;
+    private boolean invHasBalm = false;
+    private boolean invHasSanfew = false;
 
     public boolean isActive() {
         return nightmare != null && !nightmare.isDead();

@@ -38,3 +38,10 @@ any wrong values in the plugin config panel. Prayer detection depends on them; c
 Jagex's third-party client guidelines restrict some boss-helper features (especially those
 that tell you exactly what to pray). Using this on the live game is your call — check the
 current RuneLite/Jagex guidelines.
+
+## Parasite text & sidebar
+- **Parasite text:** when a parasite is detected, text appears above your player telling you to click the
+  **Hitpoints orb**, with **Relicym's balm** used before **Sanfew serum**.
+- **PNM sidebar panel:** a Phosani's Nightmare button in the RuneLite sidebar opens a live status panel.
+- **True NPC Highlight:** turn off the `highlightNpcs` ("Highlight adds") option to use RuneLite's own
+  True NPC Highlight for sleepwalkers and other adds.
