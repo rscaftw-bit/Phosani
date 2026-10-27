@@ -94,7 +94,7 @@ public class PhosaniHelperOverlay extends Overlay {
             int autosLeft = 4 - (state.getAutoAttackCount() % 4);
             renderNpcText(g, state.getNightmare(),
                 autosLeft + " auto" + (autosLeft == 1 ? "" : "s") + " to special",
-                autosLeft == 1 ? Color.RED : Color.WHITE);
+                autosLeft == 1 ? Color.BLUE : Color.WHITE);
         }
 
         return null;

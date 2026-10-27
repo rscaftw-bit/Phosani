@@ -46,6 +46,8 @@ public class PhosaniState {
     private int surgeExpiryTick = -1;
     // Ignore further position jumps until this tick (her landing / walking back)
     private int surgeCooldownUntil = -1;
+    // Her tile when the fight was first seen = middle of the arena (kept across phases)
+    private WorldPoint arenaCentre = null;
 
     // ── Curse ────────────────────────────────────────────────────────────────
     private boolean cursed = false;
@@ -82,6 +84,7 @@ public class PhosaniState {
         parasiteWarningUntil = -1;
         surgeExpiryTick = -1;
         surgeCooldownUntil = -1;
+        arenaCentre = null;
         cursed = false;
         curseExpiryTick = -1;
     }

@@ -102,4 +102,22 @@ public class PhosaniLogicTest {
         org.junit.Assert.assertEquals(m, PhosaniLogic.indicatorPrayer(true, 9, m));
         org.junit.Assert.assertNull(PhosaniLogic.indicatorPrayer(true, 0, null));
     }
+
+    @org.junit.Test
+    public void phosaniMatchedByNameInEveryPhase() {
+        org.junit.Assert.assertTrue(PhosaniLogic.isPhosaniName("Phosani's Nightmare"));
+        org.junit.Assert.assertTrue(PhosaniLogic.isPhosaniName("<col=ffff00>Phosani's Nightmare</col>"));
+        org.junit.Assert.assertFalse(PhosaniLogic.isPhosaniName("The Nightmare"));
+        org.junit.Assert.assertFalse(PhosaniLogic.isPhosaniName(null));
+    }
+
+    @org.junit.Test
+    public void surgeAxisFollowsEdge() {
+        net.runelite.api.coords.WorldPoint c = new net.runelite.api.coords.WorldPoint(100, 100, 0);
+        // teleported to north edge -> charges south: north-south lane
+        org.junit.Assert.assertArrayEquals(new int[]{0, 1}, PhosaniLogic.surgeAxisFromCentre(c, new net.runelite.api.coords.WorldPoint(101, 107, 0)));
+        // west edge -> east-west lane
+        org.junit.Assert.assertArrayEquals(new int[]{1, 0}, PhosaniLogic.surgeAxisFromCentre(c, new net.runelite.api.coords.WorldPoint(93, 98, 0)));
+        org.junit.Assert.assertNull(PhosaniLogic.surgeAxisFromCentre(c, c));
+    }
 }

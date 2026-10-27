@@ -130,4 +130,22 @@ final class PhosaniLogic {
         if (recommended == null) return null;
         return (cursed || ticksSinceAttack <= 3) ? recommended : null;
     }
+
+    static boolean isPhosaniName(String name) {
+        return name != null && net.runelite.client.util.Text.removeTags(name).trim()
+            .equalsIgnoreCase("Phosani's Nightmare");
+    }
+
+    /**
+     * She teleports to an edge and charges straight across to the opposite edge.
+     * The edge she is on (relative to the arena centre) fixes the charge axis:
+     * north/south edge = north-south lane {0,1}; east/west edge = east-west lane {1,0}.
+     */
+    static int[] surgeAxisFromCentre(WorldPoint centre, WorldPoint edge) {
+        if (centre == null || edge == null) return null;
+        int dx = Math.abs(edge.getX() - centre.getX());
+        int dy = Math.abs(edge.getY() - centre.getY());
+        if (dx == dy) return null; // corner / no offset: let the fallback decide
+        return dx > dy ? new int[]{1, 0} : new int[]{0, 1};
+    }
 }

@@ -83,7 +83,7 @@ public interface PhosaniHelperConfig extends Config {
 
     @ConfigItem(keyName = "npcIdPhosani", name = "Phosani NPC ID",
         description = "Main Phosani's Nightmare NPC ID (comma-list for all phases)", position = 40)
-    default String npcIdPhosani() { return "9416,9417,9418,9419"; }
+    default String npcIdPhosani() { return "9416,9417,9418,9419,9420,9421,9422,9423,9424,11153,11154,11155"; }
 
     // ── Object / graphic IDs (verify in-game with Developer Tools) ────────────
 
@@ -142,6 +142,11 @@ public interface PhosaniHelperConfig extends Config {
         description = "On = lane perpendicular to her teleport jump (matches in-game test). "
             + "The lane also snaps to her real movement once she starts charging.", position = 46)
     default boolean surgePerpendicular() { return true; }
+
+    @ConfigItem(keyName = "surgeFromCentre", name = "Surge: lane from arena centre",
+        description = "On = she charges from the edge she teleported to, straight across through the middle "
+            + "(lane axis = which edge she is on). Off = use the teleport-jump rule below.", position = 45)
+    default boolean surgeFromCentre() { return true; }
 
     @Range(min = 3, max = 20)
     @ConfigItem(keyName = "surgeJumpTiles", name = "Surge: teleport distance",
