@@ -31,7 +31,8 @@ public class PrayerHelperOverlay extends Overlay {
         this.config        = config;
         this.spriteManager = spriteManager;
 
-        setPosition(OverlayPosition.TOP_LEFT);
+        // Resizable mode: bottom-right of the game view = just left of the inventory (Alt+drag to move)
+        setPosition(OverlayPosition.BOTTOM_RIGHT);
         setLayer(OverlayLayer.ABOVE_WIDGETS);
         setPriority(OverlayPriority.HIGHEST);
     }
@@ -53,13 +54,14 @@ public class PrayerHelperOverlay extends Overlay {
         Prayer shown = cursed ? PhosaniLogic.prayerToClick(needed, config.curseRotation()) : needed;
 
         int iconSize = config.prayerIconSize();
-        int padding  = 8;
-        int panelW   = Math.max(iconSize, 150) + padding * 2;
+        int padding  = 6;
+        int panelW   = Math.max(iconSize, 130) + padding * 2;
         int panelH   = padding * 2
             + 20                                   // header
             + (shown != null ? iconSize + 24 : 0)  // icon + label
             + (cursed && needed != null ? 16 : 0)  // "blocks X" line
             + (cursed && needed == null ? 48 : 0)  // mapping table
+            + (cursed ? 16 : 0)                    // curse attack counter
             + (config.showAutoCountdown() ? 16 : 0);
 
         int x = padding, y = padding;
@@ -103,6 +105,15 @@ public class PrayerHelperOverlay extends Overlay {
                 g.drawString(prayerLabel(need) + " attack \u2192 click " + prayerLabel(click), cx, cy + 12);
                 cy += 16;
             }
+        }
+
+        if (cursed) {
+            int left = PhosaniLogic.curseAttacksLeft(state.getCursedAttacks());
+            g.setFont(new Font("Arial", Font.BOLD, 12));
+            g.setColor(new Color(255, 120, 200));
+            g.drawString("Curse: " + state.getCursedAttacks() + "/" + PhosaniLogic.CURSE_ATTACKS
+                + " hits - " + left + " left", cx, cy + 12);
+            cy += 16;
         }
 
         if (config.showAutoCountdown()) {
