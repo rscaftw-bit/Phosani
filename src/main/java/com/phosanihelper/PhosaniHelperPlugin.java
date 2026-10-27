@@ -296,6 +296,7 @@ public class PhosaniHelperPlugin extends Plugin {
         String msg = Text.removeTags(event.getMessage());
         if (msg.contains(PhosaniLogic.CURSE_START)) {
             state.setCursed(true);
+            state.setCursedAttacks(0);
             state.setCurseExpiryTick(client.getTickCount() + config.curseTimeoutTicks());
             log.debug("Curse ON");
         } else if (msg.contains(PhosaniLogic.PARASITE_START)) {
@@ -303,6 +304,7 @@ public class PhosaniHelperPlugin extends Plugin {
             state.setParasiteWarningUntil(client.getTickCount() + config.parasiteWarningTicks());
         } else if (msg.contains(PhosaniLogic.CURSE_END)) {
             state.setCursed(false);
+            state.setCursedAttacks(0);
             log.debug("Curse OFF");
         }
     }
@@ -352,6 +354,15 @@ public class PhosaniHelperPlugin extends Plugin {
             state.setLastAttackTick(tick);
             state.setTicksSinceAttack(0);
             state.setAutoAttackCount(state.getAutoAttackCount() + 1);
+            // Curse phase only: count her attacks; the curse lifts after the 5th
+            if (state.isCursed()) {
+                state.setCursedAttacks(state.getCursedAttacks() + 1);
+                if (PhosaniLogic.curseAttacksLeft(state.getCursedAttacks()) == 0) {
+                    state.setCursed(false);
+                    state.setCursedAttacks(0);
+                    log.debug("Curse OFF (5 attacks)");
+                }
+            }
         }
     }
 

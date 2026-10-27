@@ -148,4 +148,11 @@ final class PhosaniLogic {
         if (dx == dy) return null; // corner / no offset: let the fallback decide
         return dx > dy ? new int[]{1, 0} : new int[]{0, 1};
     }
+
+    static final int CURSE_ATTACKS = 5;
+
+    /** Attacks still to come before the curse lifts (never negative). */
+    static int curseAttacksLeft(int cursedAttacks) {
+        return Math.max(0, CURSE_ATTACKS - Math.max(0, cursedAttacks));
+    }
 }

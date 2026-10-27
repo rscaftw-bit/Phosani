@@ -118,18 +118,18 @@ public interface PhosaniHelperConfig extends Config {
     // ── Curse ─────────────────────────────────────────────────────────────────
 
     enum CurseRotation {
-        NEED_MELEE_CLICK_MAGIC("Melee→Magic, Magic→Range, Range→Melee"),
-        NEED_MELEE_CLICK_RANGE("Melee→Range, Magic→Melee, Range→Magic (wiki)");
+        NEED_MELEE_CLICK_MAGIC("Need Melee: click Magic (old)"),
+        NEED_MELEE_CLICK_RANGE("Need Melee: click Missiles (wiki)");
 
         private final String label;
         CurseRotation(String label) { this.label = label; }
         @Override public String toString() { return label; }
     }
 
-    @ConfigItem(keyName = "curseRotation", name = "Curse: needed → click",
+    @ConfigItem(keyName = "curseRotationV2", name = "Curse: needed → click",
         description = "Which prayer to click while cursed, per needed protection. "
             + "Detected from the 'has cursed you' / 'curse wear off' chat messages.", position = 44)
-    default CurseRotation curseRotation() { return CurseRotation.NEED_MELEE_CLICK_MAGIC; }
+    default CurseRotation curseRotation() { return CurseRotation.NEED_MELEE_CLICK_RANGE; }
 
     @Range(min = 10, max = 200)
     @ConfigItem(keyName = "curseTimeoutTicks", name = "Curse safety timeout (ticks)",
