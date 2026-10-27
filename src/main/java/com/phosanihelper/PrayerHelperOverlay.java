@@ -54,8 +54,8 @@ public class PrayerHelperOverlay extends Overlay {
         Prayer shown = cursed ? PhosaniLogic.prayerToClick(needed, config.curseRotation()) : needed;
 
         int iconSize = config.prayerIconSize();
-        int padding  = 8;
-        int panelW   = Math.max(iconSize, 150) + padding * 2;
+        int padding  = 6;
+        int panelW   = Math.max(iconSize, 130) + padding * 2;
         int panelH   = padding * 2
             + 20                                   // header
             + (shown != null ? iconSize + 24 : 0)  // icon + label

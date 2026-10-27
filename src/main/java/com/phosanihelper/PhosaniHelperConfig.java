@@ -55,7 +55,7 @@ public interface PhosaniHelperConfig extends Config {
     @Range(min = 40, max = 200)
     @ConfigItem(keyName = "prayerIconSize", name = "Prayer icon size (px)",
         description = "Size of the prayer recommendation icon", position = 20)
-    default int prayerIconSize() { return 90; }
+    default int prayerIconSize() { return 81; }
 
     // ── Animation IDs (adjustable if Jagex changes them) ─────────────────────
 
