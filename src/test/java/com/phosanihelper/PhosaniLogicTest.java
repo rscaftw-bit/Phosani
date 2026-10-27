@@ -93,4 +93,13 @@ public class PhosaniLogicTest {
         org.junit.Assert.assertTrue(PhosaniLogic.isSanfew("Sanfew serum(4)"));
         org.junit.Assert.assertFalse(PhosaniLogic.isSanfew("Super restore(4)"));
     }
+
+    @org.junit.Test
+    public void cursedIndicatorDoesNotFade() {
+        net.runelite.api.Prayer m = net.runelite.api.Prayer.PROTECT_FROM_MELEE;
+        org.junit.Assert.assertNull(PhosaniLogic.indicatorPrayer(false, 5, m));
+        org.junit.Assert.assertEquals(m, PhosaniLogic.indicatorPrayer(false, 2, m));
+        org.junit.Assert.assertEquals(m, PhosaniLogic.indicatorPrayer(true, 9, m));
+        org.junit.Assert.assertNull(PhosaniLogic.indicatorPrayer(true, 0, null));
+    }
 }
