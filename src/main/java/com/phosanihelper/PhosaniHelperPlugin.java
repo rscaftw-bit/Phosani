@@ -162,7 +162,7 @@ public class PhosaniHelperPlugin extends Plugin {
         // movement axis (ground truth beats the teleport-based guess).
         if (state.isSurgeActive() && state.getSurgeStartTile() != null) {
             WorldPoint start = state.getSurgeStartTile();
-            if (PhosaniLogic.tileDistance(start, current) >= 2) {
+            if (PhosaniLogic.tileDistance(start, current) >= 3) {
                 int[] axis = PhosaniLogic.movementAxis(start, current);
                 if (axis != null) {
                     setLane(boss, start, axis);
@@ -174,7 +174,11 @@ public class PhosaniHelperPlugin extends Plugin {
         if (now < state.getSurgeCooldownUntil()) return;
 
         if (PhosaniLogic.tileDistance(previous, current) >= config.surgeJumpTiles()) {
-            int[] axis = PhosaniLogic.surgeAxis(previous, current, config.surgePerpendicular());
+            WorldPoint centre = state.getArenaCentre();
+            int[] axis = (config.surgeFromCentre() && centre != null)
+                ? PhosaniLogic.surgeAxisFromCentre(centre, current)
+                : null;
+            if (axis == null) axis = PhosaniLogic.surgeAxis(previous, current, config.surgePerpendicular());
             if (axis != null) {
                 startSurge(boss, current, axis, now);
                 log.debug("Surge teleport detected {} -> {}, axis {},{}", previous, current, axis[0], axis[1]);
@@ -204,7 +208,7 @@ public class PhosaniHelperPlugin extends Plugin {
     @Subscribe
     public void onNpcSpawned(NpcSpawned event) {
         NPC npc = event.getNpc();
-        if (phosaniIds.contains(npc.getId())) {
+        if (isPhosani(npc)) {
             log.debug("Phosani detected (NPC id {})", npc.getId());
             // Only reset when entering a new fight; a re-spawn mid-fight (e.g. teleport)
             // must keep curse / position tracking.
@@ -212,6 +216,9 @@ public class PhosaniHelperPlugin extends Plugin {
                 state.clear();
             }
             state.setNightmare(npc);
+            if (state.getArenaCentre() == null && npc.getLocalLocation() != null) {
+                state.setArenaCentre(WorldPoint.fromLocal(client, npc.getLocalLocation()));
+            }
         }
     }
 
@@ -221,7 +228,7 @@ public class PhosaniHelperPlugin extends Plugin {
     @Subscribe
     public void onNpcChanged(NpcChanged event) {
         NPC npc = event.getNpc();
-        if (phosaniIds.contains(npc.getId())) {
+        if (isPhosani(npc)) {
             state.setNightmare(npc);
             log.debug("Phosani phase change → NPC id {}", npc.getId());
         }
@@ -234,7 +241,7 @@ public class PhosaniHelperPlugin extends Plugin {
     public void onAnimationChanged(AnimationChanged event) {
         if (!(event.getActor() instanceof NPC)) return;
         NPC npc = (NPC) event.getActor();
-        if (!phosaniIds.contains(npc.getId())) return;
+        if (!isPhosani(npc)) return;
 
         int anim = npc.getAnimation();
         int tick  = client.getTickCount();
@@ -350,7 +357,12 @@ public class PhosaniHelperPlugin extends Plugin {
 
     private boolean isPhosaniNearby() {
         return client.getNpcs().stream()
-            .anyMatch(n -> phosaniIds.contains(n.getId()));
+            .anyMatch(this::isPhosani);
+    }
+
+    /** All phases: match the configured IDs OR the name (IDs change every phase). */
+    private boolean isPhosani(NPC n) {
+        return n != null && (phosaniIds.contains(n.getId()) || PhosaniLogic.isPhosaniName(n.getName()));
     }
 
     /** Parses a comma-separated ID list; ignores malformed entries instead of throwing. */
