@@ -53,6 +53,8 @@ public class PhosaniState {
     private boolean cursed = false;
     // Safety timeout in case the "wear off" chat message is missed
     private int curseExpiryTick = -1;
+    // Her attacks received while cursed (curse lifts after 5)
+    private int cursedAttacks = 0;
 
     // ── Parasite ─────────────────────────────────────────────────────────────
     // Show "PARASITE IN YOU" until this tick (set from the chat message)
@@ -87,6 +89,7 @@ public class PhosaniState {
         arenaCentre = null;
         cursed = false;
         curseExpiryTick = -1;
+        cursedAttacks = 0;
     }
 
     public void incrementTicksSinceAttack() {

@@ -120,4 +120,22 @@ public class PhosaniLogicTest {
         org.junit.Assert.assertArrayEquals(new int[]{1, 0}, PhosaniLogic.surgeAxisFromCentre(c, new net.runelite.api.coords.WorldPoint(93, 98, 0)));
         org.junit.Assert.assertNull(PhosaniLogic.surgeAxisFromCentre(c, c));
     }
+
+    @Test
+    public void defaultCurseMappingMatchesWiki() {
+        // Wiki: Melee button -> Magic, Magic -> Missiles, Missiles -> Melee
+        PhosaniHelperConfig.CurseRotation def = new PhosaniHelperConfig() {}.curseRotation();
+        assertEquals(Prayer.PROTECT_FROM_MISSILES, PhosaniLogic.prayerToClick(Prayer.PROTECT_FROM_MELEE, def));
+        assertEquals(Prayer.PROTECT_FROM_MELEE,    PhosaniLogic.prayerToClick(Prayer.PROTECT_FROM_MAGIC, def));
+        assertEquals(Prayer.PROTECT_FROM_MAGIC,    PhosaniLogic.prayerToClick(Prayer.PROTECT_FROM_MISSILES, def));
+    }
+
+    @Test
+    public void curseCounter() {
+        assertEquals(5, PhosaniLogic.curseAttacksLeft(0));
+        assertEquals(1, PhosaniLogic.curseAttacksLeft(4));
+        assertEquals(0, PhosaniLogic.curseAttacksLeft(5));
+        assertEquals(0, PhosaniLogic.curseAttacksLeft(7));
+        assertEquals(5, PhosaniLogic.curseAttacksLeft(-1));
+    }
 }
