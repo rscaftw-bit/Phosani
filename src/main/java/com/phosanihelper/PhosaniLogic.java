@@ -120,4 +120,14 @@ final class PhosaniLogic {
     static boolean isSanfew(String name) {
         return name != null && name.toLowerCase().startsWith("sanfew serum");
     }
+
+    /**
+     * Which attack-prayer the overlay is based on. Normally it fades after 3 ticks;
+     * while cursed it must stay up (until her next attack) or the box falls back to the
+     * generic mapping table instead of the prayer to click.
+     */
+    static Prayer indicatorPrayer(boolean cursed, int ticksSinceAttack, Prayer recommended) {
+        if (recommended == null) return null;
+        return (cursed || ticksSinceAttack <= 3) ? recommended : null;
+    }
 }

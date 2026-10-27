@@ -44,7 +44,7 @@ public class PrayerHelperOverlay extends Overlay {
         if (!config.showPrayerHelper() || !state.isActive()) return null;
 
         boolean cursed = state.isCursed();
-        Prayer needed = state.isPrayerIndicatorActive() ? state.getRecommendedPrayer() : null;
+        Prayer needed = PhosaniLogic.indicatorPrayer(cursed, state.getTicksSinceAttack(), state.getRecommendedPrayer());
         if (needed == null && !cursed) return null;
 
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -108,7 +108,7 @@ public class PrayerHelperOverlay extends Overlay {
         if (config.showAutoCountdown()) {
             int autosLeft = 4 - (state.getAutoAttackCount() % 4);
             g.setFont(new Font("Arial", Font.PLAIN, 11));
-            g.setColor(autosLeft == 1 ? Color.RED : Color.WHITE);
+            g.setColor(autosLeft == 1 ? Color.BLUE : Color.WHITE);
             g.drawString(autosLeft + " auto" + (autosLeft == 1 ? "" : "s") + " \u2192 special", cx, cy + 12);
         }
 
