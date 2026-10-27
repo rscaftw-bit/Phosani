@@ -53,77 +53,91 @@ public class PrayerHelperOverlay extends Overlay {
         // While cursed the big icon is the prayer you physically CLICK.
         Prayer shown = cursed ? PhosaniLogic.prayerToClick(needed, config.curseRotation()) : needed;
 
-        int iconSize = config.prayerIconSize();
-        int padding  = 6;
-        int panelW   = Math.max(iconSize, 130) + padding * 2;
-        int panelH   = padding * 2
-            + 20                                   // header
-            + (shown != null ? iconSize + 24 : 0)  // icon + label
-            + (cursed && needed != null ? 16 : 0)  // "blocks X" line
-            + (cursed && needed == null ? 48 : 0)  // mapping table
-            + (cursed ? 16 : 0)                    // curse attack counter
-            + (config.showAutoCountdown() ? 16 : 0);
+        // Compact box: exactly 60 px wide. Icon shrinks to fit (config size is an upper limit).
+        final int panelW  = 60;
+        final int padding = 4;
+        final int inner   = panelW - padding * 2;
+        int iconSize = Math.max(16, Math.min(config.prayerIconSize(), inner - 4));
+        boolean showLabel = shown != null && config.showAttackStyleText();
 
-        int x = padding, y = padding;
+        int panelH = padding * 2
+            + 14                                       // header
+            + (shown != null ? iconSize + 6 : 0)       // icon (+glow border)
+            + (showLabel ? 13 : 0)                     // style label
+            + (cursed && needed != null ? 12 : 0)      // "vs X" line
+            + (cursed && needed == null ? 36 : 0)      // mapping table (3 lines)
+            + (cursed ? 12 : 0)                        // curse attack counter
+            + (config.showAutoCountdown() ? 12 : 0);
+
         g.setColor(new Color(0, 0, 0, 180));
-        g.fillRoundRect(x, y, panelW, panelH, 10, 10);
+        g.fillRoundRect(0, 0, panelW, panelH, 8, 8);
         g.setColor(cursed ? new Color(255, 60, 0, 230) : new Color(255, 165, 0, 220));
-        g.setStroke(new BasicStroke(cursed ? 3 : 2));
-        g.drawRoundRect(x, y, panelW, panelH, 10, 10);
+        g.setStroke(new BasicStroke(2));
+        g.drawRoundRect(1, 1, panelW - 2, panelH - 2, 8, 8);
 
-        int cx = x + padding;
-        int cy = y + padding;
+        int cy = padding;
+        FontMetrics fm;
+        String text;
 
-        g.setFont(new Font("Arial", Font.BOLD, 13));
+        g.setFont(new Font("Arial", Font.BOLD, 11));
+        fm = g.getFontMetrics();
+        text = cursed ? "CLICK" : "PRAY";
         g.setColor(cursed ? new Color(255, 90, 0) : Color.LIGHT_GRAY);
-        g.drawString(cursed ? "CURSED - CLICK:" : "PRAY:", cx, cy + 14);
-        cy += 20;
+        g.drawString(text, (panelW - fm.stringWidth(text)) / 2, cy + 11);
+        cy += 14;
 
         if (shown != null) {
-            renderPrayerIcon(g, shown, cx, cy, iconSize);
-            if (config.showAttackStyleText()) {
-                g.setFont(new Font("Arial", Font.BOLD, 16));
+            renderPrayerIcon(g, shown, (panelW - iconSize) / 2, cy + 2, iconSize);
+            cy += iconSize + 6;
+            if (showLabel) {
+                g.setFont(new Font("Arial", Font.BOLD, 10));
+                fm = g.getFontMetrics();
+                text = prayerLabel(shown);
                 g.setColor(prayerColor(shown));
-                String label = prayerLabel(shown);
-                g.drawString(label, cx + iconSize / 2 - g.getFontMetrics().stringWidth(label) / 2, cy + iconSize + 16);
+                g.drawString(text, (panelW - fm.stringWidth(text)) / 2, cy + 10);
+                cy += 13;
             }
-            cy += iconSize + 24;
         }
 
+        g.setFont(new Font("Arial", Font.BOLD, 9));
+        fm = g.getFontMetrics();
         if (cursed && needed != null) {
-            g.setFont(new Font("Arial", Font.PLAIN, 11));
+            text = "vs " + prayerLabel(needed).substring(0, 3);
             g.setColor(Color.LIGHT_GRAY);
-            g.drawString("(blocks her " + prayerLabel(needed).toLowerCase() + " attack)", cx, cy + 11);
-            cy += 16;
+            g.drawString(text, (panelW - fm.stringWidth(text)) / 2, cy + 9);
+            cy += 12;
         } else if (cursed) {
-            // No attack seen yet: show the full remap so you can pre-pray
-            g.setFont(new Font("Arial", Font.BOLD, 12));
+            // No attack seen yet: compact remap, e.g. "MEL>RNG" = melee attack -> click Missiles
+            g.setFont(new Font("Arial", Font.BOLD, 8));
+            fm = g.getFontMetrics();
             Prayer[] all = {Prayer.PROTECT_FROM_MELEE, Prayer.PROTECT_FROM_MAGIC, Prayer.PROTECT_FROM_MISSILES};
             for (Prayer need : all) {
                 Prayer click = PhosaniLogic.prayerToClick(need, config.curseRotation());
+                text = prayerLabel(need).substring(0, 3) + ">" + prayerLabel(click).substring(0, 3);
                 g.setColor(prayerColor(click));
-                g.drawString(prayerLabel(need) + " attack \u2192 click " + prayerLabel(click), cx, cy + 12);
-                cy += 16;
+                g.drawString(text, (panelW - fm.stringWidth(text)) / 2, cy + 9);
+                cy += 12;
             }
         }
 
+        g.setFont(new Font("Arial", Font.BOLD, 9));
+        fm = g.getFontMetrics();
         if (cursed) {
-            int left = PhosaniLogic.curseAttacksLeft(state.getCursedAttacks());
-            g.setFont(new Font("Arial", Font.BOLD, 12));
+            text = "Curse " + Math.min(state.getCursedAttacks(), PhosaniLogic.CURSE_ATTACKS)
+                + "/" + PhosaniLogic.CURSE_ATTACKS;
             g.setColor(new Color(255, 120, 200));
-            g.drawString("Curse: " + state.getCursedAttacks() + "/" + PhosaniLogic.CURSE_ATTACKS
-                + " hits - " + left + " left", cx, cy + 12);
-            cy += 16;
+            g.drawString(text, (panelW - fm.stringWidth(text)) / 2, cy + 9);
+            cy += 12;
         }
 
         if (config.showAutoCountdown()) {
             int autosLeft = 4 - (state.getAutoAttackCount() % 4);
-            g.setFont(new Font("Arial", Font.PLAIN, 11));
+            text = autosLeft + " \u2192 spec";
             g.setColor(autosLeft == 1 ? Color.BLUE : Color.WHITE);
-            g.drawString(autosLeft + " auto" + (autosLeft == 1 ? "" : "s") + " \u2192 special", cx, cy + 12);
+            g.drawString(text, (panelW - fm.stringWidth(text)) / 2, cy + 9);
         }
 
-        return new Dimension(panelW + padding * 2, panelH + padding * 2);
+        return new Dimension(panelW, panelH);
     }
 
     // ── Icon rendering ────────────────────────────────────────────────────────
