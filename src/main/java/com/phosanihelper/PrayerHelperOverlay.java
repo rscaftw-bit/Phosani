@@ -43,8 +43,8 @@ public class PrayerHelperOverlay extends Overlay {
         this.config        = config;
         this.spriteManager = spriteManager;
 
-        // Drawn in canvas coordinates: just above the inventory panel, on its left side.
-        setPosition(OverlayPosition.DYNAMIC);
+        // Detached = Alt+drag movable. Default spot is set in render(): above the inventory, on its left.
+        setPosition(OverlayPosition.DETACHED);
         setLayer(OverlayLayer.ABOVE_WIDGETS);
         setPriority(OverlayPriority.HIGHEST);
     }
@@ -81,13 +81,22 @@ public class PrayerHelperOverlay extends Overlay {
             + (cursed ? 12 : 0)                        // curse attack counter
             + (config.showAutoCountdown() ? 12 : 0);
 
-        Point anchor = sidePanelTopLeft();
-        if (anchor != null) {
-            g.translate(anchor.x - GAP - panelW, anchor.y - GAP - LIFT - panelH);
-        } else {
-            // Fixed mode / no side panel: bottom-right corner of the game view.
-            g.translate(client.getViewportXOffset() + client.getViewportWidth() - GAP - panelW,
-                client.getViewportYOffset() + client.getViewportHeight() - GAP - panelH);
+        // Default spot: just above the inventory. Once Alt+dragged, RuneLite's saved spot wins
+        // (Alt + right-click > Reset brings it back here).
+        if (getPreferredLocation() == null) {
+            Point anchor = sidePanelTopLeft();
+            int x, y;
+            if (anchor != null) {
+                x = anchor.x - GAP - panelW;
+                y = anchor.y - GAP - LIFT - panelH;
+            } else {
+                // Fixed mode / no side panel: bottom-right corner of the game view.
+                x = client.getViewportXOffset() + client.getViewportWidth() - GAP - panelW;
+                y = client.getViewportYOffset() + client.getViewportHeight() - GAP - panelH;
+            }
+            Rectangle b = getBounds();
+            g.translate(x - b.x, y - b.y);
+            b.setLocation(x, y);
         }
 
         g.setColor(new Color(0, 0, 0, 180));
