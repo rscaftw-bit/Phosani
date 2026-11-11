@@ -16,6 +16,8 @@ import java.awt.image.BufferedImage;
  */
 public class PrayerHelperOverlay extends Overlay {
 
+    private static final int X_SHIFT = 75; // ~2 cm at 96 DPI
+
     private final Client client;
     private final PhosaniHelperPlugin plugin;
     private final PhosaniHelperConfig config;
@@ -49,6 +51,9 @@ public class PrayerHelperOverlay extends Overlay {
         if (needed == null && !cursed) return null;
 
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        // Shift the box ~2 cm right of its anchor (over the inventory edge).
+        g.translate(X_SHIFT, 0);
 
         // While cursed the big icon is the prayer you physically CLICK.
         Prayer shown = cursed ? PhosaniLogic.prayerToClick(needed, config.curseRotation()) : needed;
