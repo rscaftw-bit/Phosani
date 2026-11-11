@@ -129,11 +129,6 @@ public interface PhosaniHelperConfig extends Config {
             + "Detected from the 'has cursed you' / 'curse wear off' chat messages.", position = 44, hidden = true)
     default CurseRotation curseRotation() { return CurseRotation.NEED_MELEE_CLICK_RANGE; }
 
-    @Range(min = 10, max = 200)
-    @ConfigItem(keyName = "curseTimeoutTicks", name = "Curse safety timeout (ticks)",
-        description = "Drop the curse mode after this many ticks if the wear-off message is missed", position = 45, hidden = true)
-    default int curseTimeoutTicks() { return 50; }
-
     // ── Surge (hidden) ───────────────────────────────────────────────────────
 
     @ConfigItem(keyName = "surgePerpendicular", name = "Surge: lane across teleport",

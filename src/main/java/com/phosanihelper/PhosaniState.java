@@ -50,7 +50,6 @@ public class PhosaniState {
     // ── Curse ────────────────────────────────────────────────────────────────
     private boolean cursed = false;
     // Safety timeout in case the "wear off" chat message is missed
-    private int curseExpiryTick = -1;
     // Her attacks received while cursed (curse lifts after 5)
     private int cursedAttacks = 0;
 
@@ -84,7 +83,6 @@ public class PhosaniState {
         surgeCooldownUntil = -1;
         arenaCentre = null;
         cursed = false;
-        curseExpiryTick = -1;
         cursedAttacks = 0;
     }
 

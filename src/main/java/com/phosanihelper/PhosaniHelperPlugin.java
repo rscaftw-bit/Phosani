@@ -120,11 +120,6 @@ public class PhosaniHelperPlugin extends Plugin {
         final int now = client.getTickCount();
         state.getDangerTiles().values().removeIf(expiry -> expiry <= now);
 
-        // Curse safety timeout (normally ended by the "wear off" chat message)
-        if (state.isCursed() && now >= state.getCurseExpiryTick()) {
-            state.setCursed(false);
-        }
-
         // Surge lane expiry
         if (state.isSurgeActive() && now >= state.getSurgeExpiryTick()) {
             state.getSurgeTiles().clear();
@@ -287,7 +282,6 @@ public class PhosaniHelperPlugin extends Plugin {
         if (msg.contains(PhosaniLogic.CURSE_START)) {
             state.setCursed(true);
             state.setCursedAttacks(0);
-            state.setCurseExpiryTick(client.getTickCount() + config.curseTimeoutTicks());
             log.debug("Curse ON");
         } else if (msg.contains(PhosaniLogic.PARASITE_START)) {
             refreshInventoryFlags();
