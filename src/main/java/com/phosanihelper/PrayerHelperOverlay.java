@@ -19,6 +19,7 @@ import java.awt.image.BufferedImage;
 public class PrayerHelperOverlay extends Overlay {
 
     private static final int GAP = 4;
+    private static final int LIFT = 19; // extra ~0.5 cm above the inventory
 
     // Inventory panel widgets for resizable classic + modern layouts.
     private static final int[] SIDE_PANEL_IDS = {
@@ -82,7 +83,7 @@ public class PrayerHelperOverlay extends Overlay {
 
         Point anchor = sidePanelTopLeft();
         if (anchor != null) {
-            g.translate(anchor.x - GAP - panelW, anchor.y - GAP - panelH);
+            g.translate(anchor.x - GAP - panelW, anchor.y - GAP - LIFT - panelH);
         } else {
             // Fixed mode / no side panel: bottom-right corner of the game view.
             g.translate(client.getViewportXOffset() + client.getViewportWidth() - GAP - panelW,

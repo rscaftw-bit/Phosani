@@ -38,7 +38,7 @@ public interface PhosaniHelperConfig extends Config {
     @Alpha
     @ConfigItem(keyName = "surgeColor", name = "Surge lane color",
         description = "Color of the surge lane (do not stand here)", position = 10)
-    default Color surgeColor() { return new Color(255, 0, 255, 90); }
+    default Color surgeColor() { return new Color(255, 0, 255, 35); }
 
     @Alpha
     @ConfigItem(keyName = "mushroomColor", name = "Mushroom tile color",

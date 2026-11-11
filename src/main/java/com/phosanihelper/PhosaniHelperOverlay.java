@@ -135,7 +135,9 @@ public class PhosaniHelperOverlay extends Overlay {
     /** Fills the lane she will charge through; stand outside it. */
     private void renderSurgeLane(Graphics2D g, PhosaniState state) {
         Color fill = config.surgeColor();
-        Color border = new Color(fill.getRed(), fill.getGreen(), fill.getBlue(), 255);
+        // Border follows the fill's transparency so a faint lane stays faint.
+        Color border = new Color(fill.getRed(), fill.getGreen(), fill.getBlue(),
+            Math.min(255, fill.getAlpha() * 3));
         for (WorldPoint wp : state.getSurgeTiles()) {
             renderTileFilled(g, wp, fill, border, 1);
         }
