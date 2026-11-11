@@ -115,17 +115,10 @@ public class PhosaniHelperPlugin extends Plugin {
             }
         }
 
-        // Increment tick counter for prayer indicator fade
-        state.incrementTicksSinceAttack();
 
         // Expire old danger tiles
         final int now = client.getTickCount();
         state.getDangerTiles().values().removeIf(expiry -> expiry <= now);
-
-        // Keep auto-attack counter display sane
-        if (state.getAutoAttackCount() > 4) {
-            state.setAutoAttackCount(0);
-        }
 
         // Curse safety timeout (normally ended by the "wear off" chat message)
         if (state.isCursed() && now >= state.getCurseExpiryTick()) {
@@ -193,7 +186,6 @@ public class PhosaniHelperPlugin extends Plugin {
         // Ignore her landing on the far side and her return to the middle
         state.setSurgeCooldownUntil(now + config.surgeShowTicks() + 8);
         state.setActiveSpecial(PhosaniState.SpecialAttack.SURGE);
-        state.setAutoAttackCount(0);
     }
 
     private void setLane(NPC boss, WorldPoint centre, int[] axis) {
@@ -277,11 +269,9 @@ public class PhosaniHelperPlugin extends Plugin {
 
         } else if (anim == config.animMushroom()) {
             state.setActiveSpecial(PhosaniState.SpecialAttack.MUSHROOMS);
-            state.setAutoAttackCount(0);
 
         } else if (anim == config.animParasite()) {
             state.setActiveSpecial(PhosaniState.SpecialAttack.PARASITES);
-            state.setAutoAttackCount(0);
         }
     }
 
@@ -352,8 +342,6 @@ public class PhosaniHelperPlugin extends Plugin {
     private void countAutoAttack(int tick) {
         if (tick != state.getLastAttackTick()) {
             state.setLastAttackTick(tick);
-            state.setTicksSinceAttack(0);
-            state.setAutoAttackCount(state.getAutoAttackCount() + 1);
             // Curse phase only: count her attacks; the curse lifts after the 5th
             if (state.isCursed()) {
                 state.setCursedAttacks(state.getCursedAttacks() + 1);
@@ -430,12 +418,11 @@ public class PhosaniHelperPlugin extends Plugin {
         final boolean active = state.getNightmare() != null;
         final boolean cursed = state.isCursed();
         final String attack = state.getLastAttack().name();
-        final String autos = active ? String.valueOf(4 - (state.getAutoAttackCount() % 4)) : "-";
         final boolean surge = state.isSurgeActive();
         final boolean parasite = client.getTickCount() < state.getParasiteWarningUntil();
         final String parasiteTxt = parasite
             ? PhosaniLogic.parasiteText(state.isInvHasBalm(), state.isInvHasSanfew()) : "no";
-        SwingUtilities.invokeLater(() -> p.update(active, cursed, attack, autos, surge, parasiteTxt));
+        SwingUtilities.invokeLater(() -> p.update(active, cursed, attack, surge, parasiteTxt));
     }
 
     /** Generated 16x16 "PNM" icon (no external assets). */

@@ -121,16 +121,6 @@ final class PhosaniLogic {
         return name != null && name.toLowerCase().startsWith("sanfew serum");
     }
 
-    /**
-     * Which attack-prayer the overlay is based on. Normally it fades after 3 ticks;
-     * while cursed it must stay up (until her next attack) or the box falls back to the
-     * generic mapping table instead of the prayer to click.
-     */
-    static Prayer indicatorPrayer(boolean cursed, int ticksSinceAttack, Prayer recommended) {
-        if (recommended == null) return null;
-        return (cursed || ticksSinceAttack <= 3) ? recommended : null;
-    }
-
     static boolean isPhosaniName(String name) {
         return name != null && net.runelite.client.util.Text.removeTags(name).trim()
             .equalsIgnoreCase("Phosani's Nightmare");

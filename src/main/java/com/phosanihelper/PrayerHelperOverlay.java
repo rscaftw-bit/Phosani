@@ -56,30 +56,28 @@ public class PrayerHelperOverlay extends Overlay {
         PhosaniState state = plugin.getState();
         if (!config.showPrayerHelper() || !state.isActive()) return null;
 
+        // Box stays up for the whole fight; the icon keeps her last attack until the next one.
         boolean cursed = state.isCursed();
-        Prayer needed = PhosaniLogic.indicatorPrayer(cursed, state.getTicksSinceAttack(), state.getRecommendedPrayer());
-        if (needed == null && !cursed) return null;
+        Prayer needed = state.getRecommendedPrayer();
 
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
         // While cursed the big icon is the prayer you physically CLICK.
         Prayer shown = cursed ? PhosaniLogic.prayerToClick(needed, config.curseRotation()) : needed;
 
-        // Compact box: exactly 60 px wide. Icon shrinks to fit (config size is an upper limit).
-        final int panelW  = 60;
+        final int panelW  = config.prayerBoxSize();
         final int padding = 4;
-        final int inner   = panelW - padding * 2;
-        int iconSize = Math.max(16, Math.min(config.prayerIconSize(), inner - 4));
-        boolean showLabel = shown != null && config.showAttackStyleText();
+        final int iconSize = panelW - padding * 2 - 4;
+        boolean showLabel = config.showAttackStyleText();
 
+        // Icon slot and label line are always reserved so the box doesn't jump in size.
         int panelH = padding * 2
             + 14                                       // header
-            + (shown != null ? iconSize + 6 : 0)       // icon (+glow border)
+            + iconSize + 6                             // icon (+glow border)
             + (showLabel ? 13 : 0)                     // style label
             + (cursed && needed != null ? 12 : 0)      // "vs X" line
             + (cursed && needed == null ? 36 : 0)      // mapping table (3 lines)
-            + (cursed ? 12 : 0)                        // curse attack counter
-            + (config.showAutoCountdown() ? 12 : 0);
+            + (cursed ? 12 : 0);                       // curse attack counter
 
         // Default spot: just above the inventory. Once Alt+dragged, RuneLite's saved spot wins
         // (Alt + right-click > Reset brings it back here).
@@ -116,17 +114,25 @@ public class PrayerHelperOverlay extends Overlay {
         g.drawString(text, (panelW - fm.stringWidth(text)) / 2, cy + 11);
         cy += 14;
 
+        int iconX = (panelW - iconSize) / 2;
         if (shown != null) {
-            renderPrayerIcon(g, shown, (panelW - iconSize) / 2, cy + 2, iconSize);
-            cy += iconSize + 6;
-            if (showLabel) {
+            renderPrayerIcon(g, shown, iconX, cy + 2, iconSize);
+        } else {
+            // No attack seen yet: empty slot.
+            g.setColor(new Color(255, 255, 255, 60));
+            g.setStroke(new BasicStroke(1));
+            g.drawRoundRect(iconX - 2, cy, iconSize + 4, iconSize + 4, 8, 8);
+        }
+        cy += iconSize + 6;
+        if (showLabel) {
+            if (shown != null) {
                 g.setFont(new Font("Arial", Font.BOLD, 10));
                 fm = g.getFontMetrics();
                 text = prayerLabel(shown);
                 g.setColor(prayerColor(shown));
                 g.drawString(text, (panelW - fm.stringWidth(text)) / 2, cy + 10);
-                cy += 13;
             }
+            cy += 13;
         }
 
         g.setFont(new Font("Arial", Font.BOLD, 9));
@@ -156,14 +162,6 @@ public class PrayerHelperOverlay extends Overlay {
             text = "Curse " + Math.min(state.getCursedAttacks(), PhosaniLogic.CURSE_ATTACKS)
                 + "/" + PhosaniLogic.CURSE_ATTACKS;
             g.setColor(new Color(255, 120, 200));
-            g.drawString(text, (panelW - fm.stringWidth(text)) / 2, cy + 9);
-            cy += 12;
-        }
-
-        if (config.showAutoCountdown()) {
-            int autosLeft = 4 - (state.getAutoAttackCount() % 4);
-            text = autosLeft + " \u2192 spec";
-            g.setColor(autosLeft == 1 ? Color.BLUE : Color.WHITE);
             g.drawString(text, (panelW - fm.stringWidth(text)) / 2, cy + 9);
         }
 

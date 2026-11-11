@@ -29,12 +29,10 @@ public class PhosaniState {
     private Prayer recommendedPrayer = null;
 
     private int lastAttackTick = -1;
-    private int ticksSinceAttack = 0;
 
     // Dangerous tiles (darkness zones, parasite orbs) → game tick on which they expire
     private Map<WorldPoint, Integer> dangerTiles = new HashMap<>();
     private Set<WorldPoint> mushroomTiles = new HashSet<>();
-    private int autoAttackCount = 0;
 
     // ── Surge ────────────────────────────────────────────────────────────────
     // Boss centre tile on the previous game tick (used to detect her edge teleport)
@@ -76,10 +74,8 @@ public class PhosaniState {
         activeSpecial = SpecialAttack.NONE;
         recommendedPrayer = null;
         lastAttackTick = -1;
-        ticksSinceAttack = 0;
         dangerTiles.clear();
         mushroomTiles.clear();
-        autoAttackCount = 0;
         lastBossTile = null;
         surgeTiles.clear();
         surgeStartTile = null;
@@ -92,12 +88,5 @@ public class PhosaniState {
         cursedAttacks = 0;
     }
 
-    public void incrementTicksSinceAttack() {
-        ticksSinceAttack++;
-    }
 
-    /** True if the prayer indicator should still be visible (fades after 3 ticks). */
-    public boolean isPrayerIndicatorActive() {
-        return ticksSinceAttack <= 3 && recommendedPrayer != null;
-    }
 }

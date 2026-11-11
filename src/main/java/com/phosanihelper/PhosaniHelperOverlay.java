@@ -89,14 +89,6 @@ public class PhosaniHelperOverlay extends Overlay {
             renderSurgeLane(g, state);
         }
 
-        // ── 4. Auto-attack countdown on Phosani ───────────────────────────────
-        if (config.showAutoCountdown() && state.getNightmare() != null && !state.isSurgeActive()) {
-            int autosLeft = 4 - (state.getAutoAttackCount() % 4);
-            renderNpcText(g, state.getNightmare(),
-                autosLeft + " auto" + (autosLeft == 1 ? "" : "s") + " to special",
-                autosLeft == 1 ? Color.BLUE : Color.WHITE);
-        }
-
         return null;
     }
 
