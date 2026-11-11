@@ -3,6 +3,8 @@ package com.phosanihelper;
 import net.runelite.api.Client;
 import net.runelite.api.Prayer;
 import net.runelite.api.SpriteID;
+import net.runelite.api.gameval.InterfaceID;
+import net.runelite.api.widgets.Widget;
 import net.runelite.client.game.SpriteManager;
 import net.runelite.client.ui.overlay.*;
 
@@ -16,7 +18,14 @@ import java.awt.image.BufferedImage;
  */
 public class PrayerHelperOverlay extends Overlay {
 
-    private static final int X_SHIFT = 75; // ~2 cm at 96 DPI
+    private static final int GAP = 4;
+
+    // Inventory panel widgets for resizable classic + modern layouts.
+    private static final int[] SIDE_PANEL_IDS = {
+        InterfaceID.ToplevelOsrsStretch.SIDE_TOP,
+        InterfaceID.ToplevelOsrsStretch.SIDE_PANELS,
+        InterfaceID.ToplevelPreEoc.SIDE_PANELS,
+    };
 
     private final Client client;
     private final PhosaniHelperPlugin plugin;
@@ -33,8 +42,8 @@ public class PrayerHelperOverlay extends Overlay {
         this.config        = config;
         this.spriteManager = spriteManager;
 
-        // Resizable mode: bottom-right of the game view = just left of the inventory (Alt+drag to move)
-        setPosition(OverlayPosition.BOTTOM_RIGHT);
+        // Drawn in canvas coordinates: just above the inventory panel, on its left side.
+        setPosition(OverlayPosition.DYNAMIC);
         setLayer(OverlayLayer.ABOVE_WIDGETS);
         setPriority(OverlayPriority.HIGHEST);
     }
@@ -51,9 +60,6 @@ public class PrayerHelperOverlay extends Overlay {
         if (needed == null && !cursed) return null;
 
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-        // Shift the box ~2 cm right of its anchor (over the inventory edge).
-        g.translate(X_SHIFT, 0);
 
         // While cursed the big icon is the prayer you physically CLICK.
         Prayer shown = cursed ? PhosaniLogic.prayerToClick(needed, config.curseRotation()) : needed;
@@ -73,6 +79,15 @@ public class PrayerHelperOverlay extends Overlay {
             + (cursed && needed == null ? 36 : 0)      // mapping table (3 lines)
             + (cursed ? 12 : 0)                        // curse attack counter
             + (config.showAutoCountdown() ? 12 : 0);
+
+        Point anchor = sidePanelTopLeft();
+        if (anchor != null) {
+            g.translate(anchor.x - GAP - panelW, anchor.y - GAP - panelH);
+        } else {
+            // Fixed mode / no side panel: bottom-right corner of the game view.
+            g.translate(client.getViewportXOffset() + client.getViewportWidth() - GAP - panelW,
+                client.getViewportYOffset() + client.getViewportHeight() - GAP - panelH);
+        }
 
         g.setColor(new Color(0, 0, 0, 180));
         g.fillRoundRect(0, 0, panelW, panelH, 8, 8);
@@ -143,6 +158,24 @@ public class PrayerHelperOverlay extends Overlay {
         }
 
         return new Dimension(panelW, panelH);
+    }
+
+    /** Top-left corner (canvas coords) of the visible inventory side panel, or null if none. */
+    private Point sidePanelTopLeft() {
+        Point best = null;
+        for (int id : SIDE_PANEL_IDS) {
+            Widget w = client.getWidget(id);
+            if (w == null || w.isHidden()) continue;
+            Rectangle b = w.getBounds();
+            if (b.width <= 0 || b.height <= 0) continue;
+            if (best == null) {
+                best = new Point(b.x, b.y);
+            } else {
+                best.x = Math.min(best.x, b.x);
+                best.y = Math.min(best.y, b.y);
+            }
+        }
+        return best;
     }
 
     // ── Icon rendering ────────────────────────────────────────────────────────
